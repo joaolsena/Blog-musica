@@ -1,0 +1,448 @@
+/* Estilo geral do body */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: rgb(248, 247, 248);
+  color: #333;
+
+}
+
+.header {
+  background-color: white;
+  text-align: center;
+  padding: 0;
+}
+
+header img {
+  width: 100%;
+  max-height: 250px;
+  max-width: 1300px;
+  object-fit: cover;
+}
+
+
+/* Se desejar adicionar uma animação à logo */
+@keyframes logoAnimation {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+header img:hover {
+  animation: logoAnimation 1s ease-in-out;
+}
+
+
+/* Container principal */
+.container {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 0 20px;
+}
+
+/* Estilo dos projetos na lista */
+.lista-projetos .trabalho {
+  margin-bottom: 20px;
+  padding: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  text-align: center;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.lista-projetos .trabalho h3 {
+  margin: 10px 0;
+  color: #000; 
+  text-decoration: none; 
+  border-bottom: none; 
+}
+.titulo-link{
+  text-decoration: none; 
+}
+
+.lista-projetos .trabalho img {
+  max-width: 100%; 
+  height: auto;   
+  max-height: 150px; 
+  border-radius: 8px; 
+  margin: 10px auto; 
+  display: block; 
+}
+
+.lista-projetos .trabalho span {
+  font-size: 14px;
+  color: #555;
+  display: block; 
+  margin-top: 10px; 
+}
+
+/* Estilo para o formulário */
+form {
+  background: white;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 20px;
+}
+
+form h2 {
+  margin-top: 0;
+}
+
+form input,
+form textarea,
+form button {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 16px;
+}
+label {
+  padding: px;
+}
+form button {
+  background-color: #0077cc;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+form button:hover {
+  background-color: #005fa3;
+}
+
+/* Estilo para a página de detalhes do projeto */
+.projeto-detalhes {
+  padding: 20px;
+  text-align: center;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  max-width: 800px;
+  margin: 20px auto;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.projeto-detalhes h2 {
+  color: #000; 
+  margin-bottom: 20px;
+  text-decoration: none; 
+  text-align: center; 
+}
+
+.projeto-detalhes img {
+  max-width: 100%;
+  height: auto;
+  max-height: 300px;
+  border-radius: 10px;
+  margin: 20px 0;
+}
+
+.projeto-detalhes p {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #555;
+}
+
+.projeto-detalhes a {
+  color: #0077cc;
+  text-decoration: none;
+  font-weight: bold;
+  margin-top: 20px;
+  display: inline-block;
+  transition: color 0.3s ease;
+}
+
+.projeto-detalhes a:hover {
+  color: #005fa3;
+}
+
+/* Estilo do rodapé */
+footer {
+  text-align: center;
+  padding: 20px 0;
+  background: #333;
+  color: white;
+  margin-top: 20px;
+}
+
+footer p {
+  margin: 0;
+}
+.projeto-detalhes {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  margin: 20px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.projeto-detalhes h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10px;
+ ;}
+
+.projeto-detalhes h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #444;
+  margin-top: 20px;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.projeto-detalhes h4 {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #555;
+  margin-top: 10px;
+  margin-bottom: 6px;
+  text-align: left;
+}
+
+.projeto-detalhes p {
+  font-size: 1rem;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 15px;
+  text-align: justify;
+  text-align: left;
+}
+
+.projeto-detalhes img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+
+.projeto-detalhes a {
+  font-size: 1rem;
+  color: #007bff;
+  text-decoration: none;
+  margin-bottom: 20px;
+}
+
+.projeto-detalhes a:hover {
+  text-decoration: underline;
+}
+
+.projeto-detalhes span {
+  font-size: 1rem;
+  color: #333;
+  font-weight: 500;
+  margin-top: 30px;
+}
+
+/* Layout Flex para disposição da página */
+@media (min-width: 768px) {
+  .projeto-detalhes {
+    width: 75%;
+    margin: 40px auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  .projeto-detalhes {
+    width: 60%;
+  }
+}
+
+.projeto-detalhes ul {
+  list-style-type: disc; 
+  text-align: left;
+  
+}
+
+.projeto-detalhes li {
+  font-size: 1rem;
+  color: #666;
+  margin-bottom: 8px; /* Espaço entre os itens */
+}
+
+.link{
+  text-align: left;
+  
+}
+
+.Ensine-Musica {
+  background-color: #f9f9f9; /* Fundo claro */
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); 
+  max-width: 800px;
+  margin: 40px auto;
+  font-family: 'Arial', sans-serif;
+}
+
+.Ensine-Musica h2 {
+  font-size: 28px;
+  color: #2c3e50; 
+  margin-bottom: 20px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.sobre-nos {
+  font-size: 18px;
+  color: #34495e; 
+  line-height: 1.8; 
+  text-align: justify;
+  text-indent: 20px; 
+}
+
+.sobre-nos br {
+  margin-bottom: 10px;
+}
+
+.Ensine-Musica p {
+  padding: 0 15px;
+}
+
+.Ensine-Musica {
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.Ensine-Musica:hover {
+  transform: scale(1.02); 
+  box-shadow: 0px 6px 10px rgba(0, 0, 0, 0.15); 
+}
+
+
+nav {
+  background-color: rgb(74, 140, 74); 
+  padding: 10px 20px;
+  box-shadow: 0 4px 6px rgba(239, 6, 6, 0.1); 
+  position: sticky; 
+  top: 0;
+margin-top: -4px;
+  z-index: 1000;
+}
+
+nav ul {
+  list-style-type: none; 
+  display: flex; 
+  justify-content: center; 
+  margin: 0;
+  padding: 0;
+}
+
+nav li {
+  margin: 0 15px; 
+}
+
+nav a {
+  text-decoration: none; 
+  font-size: 18px;
+  color: #ecf0f1; 
+  transition: color 0.3s ease-in-out; 
+}
+
+nav a:hover {
+  color: #f1c40f; 
+}
+
+nav a:active {
+  color: #e67e22; 
+}
+
+nav ul li button {
+  padding: 1px 2px;
+  background-color: rgb(74, 140, 74);
+  color: white; 
+  font-size: 16px;
+  border: none;
+  border-radius: 5px; 
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+
+nav ul li button:hover {
+  background-color: red; 
+  transform: scale(1.05); 
+}
+
+
+nav ul li button:focus {
+  outline: none;
+  box-shadow: 0 0 5px rgba(46, 204, 113, 0.7); 
+}
+
+
+/* Estilos gerais para o botão de edição */
+.edit-button {
+  background-color: #4CAF50; 
+  color: white; 
+  border: none; 
+  padding: 10px 20px; 
+  text-align: center; 
+  text-decoration: none; 
+  font-size: 16px; 
+  border-radius: 5px; 
+  cursor: pointer; 
+  transition: background-color 0.3s ease; 
+}
+
+.edit-button:hover {
+  background-color: #45a049; 
+}
+
+.edit-button:active {
+  background-color: #3e8e41; 
+}
+
+
+.delete-button {
+  background-color: #f44336; 
+  color: white; 
+  border: none; 
+  padding: 10px 20px; 
+  text-align: center; 
+  text-decoration: none; 
+  font-size: 16px; 
+  border-radius: 5px; 
+  cursor: pointer; 
+  transition: background-color 0.3s ease; 
+}
+
+.delete-button:hover {
+  background-color: #e53935; 
+}
+
+.delete-button:active {
+  background-color: #d32f2f; 
+}
+
+.criador{
+  color: white;
+}
+
+.imagem-container {
+  text-align: center; 
+}
+
+.imagem-passo {
+  max-width: 100%;          
+  margin-bottom: 10px;     
+  display: inline-block;    
+}
+
