@@ -60,7 +60,7 @@ function App() {
 
           {/* Rodapé da página */}
           <footer>
-            <p>&copy; 2025 Ensine Música. Todos os direitos reservados. Desenvolvido por <a href="mailto:joaolsena129@gmail.com" className="criador">João Sena</a>
+            <p>&copy; 1025 Ensine Música. Todos os direitos reservados. Desenvolvido por <a href="mailto:joaolsena129@gmail.com" className="criador">João Sena</a>
             </p>
           </footer>
         </div>
