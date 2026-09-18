@@ -3,7 +3,7 @@
    =========================================================
    Sumário:
    1. Estrutura geral
-   2. Cabeçalho (Header)
+   2. Cabeçalho (marca + navegação)
    3. Navegação (Navbar)
    4. Utilitários e botões
    5. Página inicial — lista de projetos
@@ -33,45 +33,11 @@ main {
   padding: 0 24px;
 }
 
-/* ---------- 2. Cabeçalho (Header) ---------- */
+/* ---------- 2. Cabeçalho (masthead tipográfico) ---------- */
 
 .site-header {
   background-color: var(--color-night);
-  overflow: hidden;
-  position: relative;
-}
-
-.site-header__media {
-  width: 100%;
-  max-height: 220px;
-  object-fit: cover;
-  display: block;
-  opacity: 0.92;
-}
-
-.site-header__caption {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 18px 24px 16px;
-  background: linear-gradient(180deg, rgba(36, 25, 52, 0) 0%, rgba(24, 16, 36, 0.86) 90%);
-}
-
-.site-header__caption p {
-  margin: 0;
-  color: #f6e6c2;
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 1.05rem;
-  max-width: 640px;
-}
-
-/* ---------- 3. Navegação (Navbar) ---------- */
-
-.navbar {
-  background-color: var(--color-night);
-  border-top: 1px solid var(--color-night-line);
+  border-bottom: 1px solid var(--color-night-line);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -84,18 +50,34 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 64px;
+  gap: 16px;
+  min-height: 76px;
 }
 
-.navbar__brand {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.15rem;
-  color: #fbf3e2;
+.site-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   text-decoration: none;
+  color: #f8f2e6;
+  flex-shrink: 0;
+}
+
+.site-header__mark {
+  color: var(--color-gold);
+  flex-shrink: 0;
+}
+
+.site-header__wordmark {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.35rem;
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
+
+/* ---------- 3. Navegação (Navbar) ---------- */
 
 .navbar__toggle {
   display: none;
@@ -177,11 +159,11 @@ main {
 }
 
 .navbar__list .navbar__logout {
-  color: #f0c9c2;
+  color: #e6c3c5;
 }
 
 .navbar__list .navbar__logout:hover {
-  background-color: #5a2a24;
+  background-color: #451820;
   color: #ffffff;
 }
 
@@ -235,7 +217,7 @@ main {
 
 .btn-danger {
   background-color: transparent;
-  border-color: #e3bfae;
+  border-color: #ddb9bb;
   color: var(--color-clay-dark);
 }
 
@@ -256,17 +238,25 @@ main {
 }
 
 .badge--instrumento {
-  background-color: #ece3f4;
+  background-color: #e2e9e0;
   color: var(--color-violet-dark);
 }
 
 .badge--jogo {
-  background-color: #f6e3d6;
+  background-color: #f3e0e0;
   color: var(--color-clay-dark);
 }
 
 .page-heading {
   padding: 40px 0 24px;
+}
+
+.page-heading__rule {
+  width: 56px;
+  height: 2px;
+  background-color: var(--color-gold);
+  border: none;
+  margin: 16px 0 20px;
 }
 
 .page-heading h1 {
@@ -908,7 +898,7 @@ footer p {
 
   .navbar__list {
     position: absolute;
-    top: 64px;
+    top: 76px;
     left: 0;
     right: 0;
     flex-direction: column;
@@ -930,12 +920,8 @@ footer p {
     text-align: left;
   }
 
-  .site-header__media {
-    max-height: 150px;
-  }
-
-  .site-header__caption p {
-    font-size: 0.92rem;
+  .site-header__wordmark {
+    font-size: 1.15rem;
   }
 }
 

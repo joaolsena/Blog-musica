@@ -3,8 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom"; // Im
 import "./App.css";
 import ProjetoDetalhes from "./componentes/ProjetoDetalhes"; // Página de detalhes
 import EnsineMusica from "./componentes/EnsineMusica"; // Página sobre o Ensine Música
-import Navbar from "./componentes/Navbar"; // Navbar principal
-import Header from "./componentes/Header"; // Cabeçalho principal
+import Navbar from "./componentes/Navbar"; // Cabeçalho e navegação principal
 import Projetos from "./componentes/Projetos"; // Página inicial
 import AdicionarProjeto from "./componentes/AdicionarProjeto"; // Página de adicionar projeto
 import EditProjeto from "./componentes/EditProjeto"; // Página de edição do projeto
@@ -23,8 +22,7 @@ function App() {
             Pular para o conteúdo
           </a>
 
-          {/* Componentes fixos na página, como o cabeçalho e a barra de navegação */}
-          <Header />
+          {/* Cabeçalho fixo com marca e navegação */}
           <Navbar />
 
           {/* Configuração das rotas */}

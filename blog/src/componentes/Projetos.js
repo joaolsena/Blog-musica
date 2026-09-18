@@ -45,6 +45,7 @@ function Projetos() {
     <div className="container">
       <div className="page-heading">
         <h1>Projetos</h1>
+        <hr className="page-heading__rule" />
         <p>Instrumentos e jogos musicais desenvolvidos pelos alunos, prontos para inspirar sua próxima aula.</p>
       </div>
 

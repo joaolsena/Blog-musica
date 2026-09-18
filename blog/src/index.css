@@ -4,27 +4,27 @@
    ========================================================= */
 
 :root {
-  /* Paleta — inspirada nos instrumentos artesanais da marca */
-  --color-paper: #faf4e9;        /* fundo principal, tom de papel */
-  --color-paper-raised: #fffdf9; /* cartões e superfícies elevadas */
-  --color-ink: #241a30;          /* texto principal */
-  --color-ink-soft: #4a3f59;     /* texto secundário */
-  --color-muted: #7a6f89;        /* texto auxiliar / legendas */
-  --color-line: #e6dac2;         /* linhas e bordas sobre o papel */
+  /* Paleta — madeira de violão, latão e papel de partitura, sem roxo */
+  --color-paper: #f8f2e6;        /* fundo principal, tom de papel/partitura */
+  --color-paper-raised: #fffcf6; /* cartões e superfícies elevadas */
+  --color-ink: #2b2018;          /* texto principal, castanho quase preto */
+  --color-ink-soft: #55483a;     /* texto secundário */
+  --color-muted: #8c7c68;        /* texto auxiliar / legendas */
+  --color-line: #e6d8c0;         /* linhas e bordas sobre o papel */
 
-  --color-night: #241934;        /* cabeçalho, navegação, rodapé */
-  --color-night-soft: #362849;   /* hover sobre superfícies escuras */
-  --color-night-line: rgba(250, 244, 233, 0.14);
+  --color-night: #241a11;        /* cabeçalho, navegação, rodapé — madeira escura */
+  --color-night-soft: #372918;   /* hover sobre superfícies escuras */
+  --color-night-line: rgba(248, 242, 230, 0.14);
 
-  --color-gold: #d79c2c;         /* ação primária, links */
-  --color-gold-dark: #a97a1d;
-  --color-gold-tint: #f6e6c2;
+  --color-gold: #b8863c;         /* latão — ação primária, links */
+  --color-gold-dark: #93692c;
+  --color-gold-tint: #f1e3c3;
 
-  --color-clay: #bd5a30;         /* selo "jogo", ações de exclusão */
-  --color-clay-dark: #93441f;
+  --color-clay: #7c2d34;         /* selo "jogo", ações de exclusão — vinho */
+  --color-clay-dark: #5e1f26;
 
-  --color-violet: #6e4f92;       /* selo "instrumento", detalhes */
-  --color-violet-dark: #55397a;
+  --color-violet: #3f5b46;       /* selo "instrumento" — verde floresta, forro de estojo */
+  --color-violet-dark: #2c4132;
 
   --font-display: "Fraunces", "Iowan Old Style", ui-serif, serif;
   --font-body: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
