@@ -2,6 +2,8 @@
 
 Bem-vindo ao **Blog de Música**, um projeto desenvolvido para que alunos possam compartilhar e visualizar seus trabalhos musicais. Este blog oferece uma interface amigável para envio de projetos, exploração de conteúdo e aprendizado colaborativo.
 
+
+
 Acesse o projeto em: [ensinemusica.netlify.app](https://ensinemusica.netlify.app)
 
 ## Tecnologias Utilizadas
