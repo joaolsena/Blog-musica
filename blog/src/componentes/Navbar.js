@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "./AuthContext"; // Importando o hook para obter o estado de autenticação
 
-// Marca decorativa inspirada na roseta (boca) do violão
-function RosetteMark() {
+// Marca decorativa inspirada na roseta (boca) do violão.
+// Gira como um vinil quando alguém clica — um pequeno easter egg.
+function RosetteMark({ girando }) {
   const raios = Array.from({ length: 8 });
   return (
     <svg
-      className="site-header__mark"
+      className={`site-header__mark${girando ? " is-spinning" : ""}`}
       width="30"
       height="30"
       viewBox="0 0 40 40"
@@ -37,16 +38,29 @@ function RosetteMark() {
 function Navbar() {
   const { isAuthenticated, logout } = useAuth(); // Pegando o estado de autenticação
   const [menuAberto, setMenuAberto] = useState(false);
+  const [girando, setGirando] = useState(false);
 
   const fecharMenu = () => setMenuAberto(false);
+
+  const girarLogo = () => {
+    setGirando(true);
+    window.setTimeout(() => setGirando(false), 700);
+  };
 
   const linkClasse = ({ isActive }) => (isActive ? "is-active" : undefined);
 
   return (
     <header className="site-header">
       <div className="navbar__inner">
-        <NavLink to="/" className="site-header__brand" onClick={fecharMenu}>
-          <RosetteMark />
+        <NavLink
+          to="/"
+          className="site-header__brand"
+          onClick={() => {
+            fecharMenu();
+            girarLogo();
+          }}
+        >
+          <RosetteMark girando={girando} />
           <span className="site-header__wordmark">Ensine Música</span>
         </NavLink>
 

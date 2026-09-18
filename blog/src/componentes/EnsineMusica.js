@@ -1,9 +1,11 @@
 import React from "react";
+import Waveform from "./Waveform";
 
 function EnsineMusica() {
   return (
     <div className="Ensine-Musica">
       <h2>Sobre nós</h2>
+      <Waveform />
       <p className="sobre-nos">
         O "Ensine Música" é um espaço dedicado à criatividade, inovação e colaboração no ensino musical. Com o objetivo de inspirar professores de música, oferecemos tutoriais detalhados sobre a criação de jogos, brincadeiras e instrumentos musicais feitos com materiais alternativos, pensando no ensino na educação básica e em espaços educativos diversos.
       </p>

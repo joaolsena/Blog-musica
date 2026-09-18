@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "./AuthContext"; // Importando o hook de autenticação
+import Waveform from "./Waveform";
 
 function ProjetoDetalhes() {
   const { id } = useParams(); // Pega o ID do projeto da URL
@@ -91,6 +92,7 @@ function ProjetoDetalhes() {
           </span>
         )}
         <h1>{projeto.titulo}</h1>
+        <Waveform />
         <div className="projeto-detalhes__meta">
           <span>Adicionado por {projeto.autor}</span>
           <span aria-hidden="true">•</span>
