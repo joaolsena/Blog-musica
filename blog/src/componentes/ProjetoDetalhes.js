@@ -7,6 +7,7 @@ function ProjetoDetalhes() {
   const { id } = useParams(); // Pega o ID do projeto da URL
   const [projeto, setProjeto] = useState(null); // Estado para armazenar os dados do projeto
   const [erro, setErro] = useState(null); // Estado para mensagens de erro
+  const [excluindo, setExcluindo] = useState(false);
   const { isAuthenticated } = useAuth(); // Verifica se o usuário está logado
   const navigate = useNavigate(); // Navegação após exclusão
 
@@ -32,8 +33,9 @@ function ProjetoDetalhes() {
   // Função para excluir o projeto
   const handleDelete = () => {
     const confirmDelete = window.confirm("Tem certeza que deseja apagar este projeto?");
-    
+
     if (confirmDelete) {
+      setExcluindo(true);
       axios
         .delete(`/projetos/${id}`)
         .then(() => {
@@ -43,104 +45,157 @@ function ProjetoDetalhes() {
         .catch((error) => {
           console.error("Erro ao excluir o projeto:", error);
           alert("Erro ao excluir o projeto. Tente novamente.");
-        });
+        })
+        .finally(() => setExcluindo(false));
     }
   };
 
   // Exibe uma mensagem de erro, se houver
   if (erro) {
-    return <p>{erro}</p>;
+    return (
+      <div className="container">
+        <p className="state-message">{erro}</p>
+      </div>
+    );
   }
 
   // Exibe um carregamento enquanto os dados estão sendo buscados
   if (!projeto) {
-    return <p>Carregando...</p>;
+    return (
+      <div className="container">
+        <p className="state-message">Carregando projeto...</p>
+      </div>
+    );
   }
 
-  // Renderiza os detalhes do projeto
+  const materiais = projeto.materiais
+    ? projeto.materiais.split(";").map((item) => item.trim()).filter(Boolean)
+    : [];
+
+  const etapasPassoAPasso = projeto.passoAPasso
+    ? projeto.passoAPasso.split(";").map((item) => item.trim()).filter(Boolean)
+    : [];
+
+  const instrucaoUso = [projeto.comoTocar, projeto.comoJogar].filter(Boolean).join(" ");
+
   return (
     <div className="projeto-detalhes">
-      <Link to="/" className="link">← Voltar</Link>
-      <h1>{projeto.titulo}</h1>
-      
+      <Link to="/" className="projeto-detalhes__back">
+        ← Voltar para projetos
+      </Link>
+
+      <div className="projeto-detalhes__head">
+        {projeto.tipoProjeto && (
+          <span className={`badge badge--${projeto.tipoProjeto}`}>
+            {projeto.tipoProjeto === "jogo" ? "Jogo" : "Instrumento"}
+          </span>
+        )}
+        <h1>{projeto.titulo}</h1>
+        <div className="projeto-detalhes__meta">
+          <span>Adicionado por {projeto.autor}</span>
+          <span aria-hidden="true">•</span>
+          <span>{projeto.data}</span>
+        </div>
+      </div>
+
       {/* Exibe a imagem, se existir */}
-      {projeto.imagem && <img src={projeto.imagem} alt={projeto.titulo} />}
+      {projeto.imagem && (
+        <div className="projeto-detalhes__media">
+          <img src={projeto.imagem} alt={projeto.titulo} />
+        </div>
+      )}
 
-      <h3>Descrição Geral:</h3>
-      <p>{projeto.descricaoGeral}</p>
+      <section>
+        <h3>Descrição geral</h3>
+        <p>{projeto.descricaoGeral}</p>
+      </section>
 
-      <h3>Processo de Construção:</h3>
-      <h4>Materiais Necessários:</h4>
-      <ul>
-        {projeto.materiais &&
-          projeto.materiais.split(";").map((material, index) => (
-            <li key={index}>{material.trim()}</li>
-          ))}
-      </ul>
+      <section>
+        <h3>Processo de construção</h3>
+        {materiais.length > 0 && (
+          <>
+            <h4>Materiais necessários</h4>
+            <ul className="materiais-lista">
+              {materiais.map((material, index) => (
+                <li key={index}>{material}</li>
+              ))}
+            </ul>
+          </>
+        )}
 
-      <h4>Passo a Passo:</h4>
-<div>
-  {/* Verifica se o campo 'passoAPasso' não está vazio e o exibe como texto */}
-  {projeto.passoAPasso &&
-    projeto.passoAPasso.split(";").map((etapa, index) => (
-      <p key={index}>{etapa.trim()}</p>
-    ))}
-  
- {/* Verifica se há imagens no campo 'imagensPassoAPasso' */}
-{projeto.imagensPassoAPasso && projeto.imagensPassoAPasso.length > 0 ? (
-  projeto.imagensPassoAPasso.map((url, index) => (
-    <div className="imagem-container" key={index}>
-      <img
-        src={url}
-        alt={`Imagem do Passo ${index + 1}`}
-        className="imagem-passo"
-        loading="lazy"
-      />
-    </div>
-  ))
-) : (
-  <p></p>
-)}
+        {(etapasPassoAPasso.length > 0 || (projeto.imagensPassoAPasso && projeto.imagensPassoAPasso.length > 0)) && (
+          <>
+            <h4>Passo a passo</h4>
+            {etapasPassoAPasso.map((etapa, index) => (
+              <p className="passo-etapa" key={index}>{etapa}</p>
+            ))}
 
-</div>
+            {projeto.imagensPassoAPasso && projeto.imagensPassoAPasso.length > 0 && (
+              <div className="imagens-passo-grid">
+                {projeto.imagensPassoAPasso.map((url, index) => (
+                  <div className="imagem-container" key={index}>
+                    <img
+                      src={url}
+                      alt={`Passo ${index + 1} da construção`}
+                      className="imagem-passo"
+                      loading="lazy"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
-      <h3>Instruções de Uso:</h3>
-      <h4>Como Tocar/Como Jogar:</h4>
-      <p>
-        {projeto.comoTocar} {projeto.comoJogar}
-      </p>
+      {instrucaoUso && (
+        <section>
+          <h3>Instruções de uso</h3>
+          <h4>Como tocar / como jogar</h4>
+          <p>{instrucaoUso}</p>
+        </section>
+      )}
 
-      <h3>Aplicação Didática:</h3>
-      <h4>Sugestões de Atividades:</h4>
-      <p>{projeto.sugestoesAtividades}</p>
-      <h4>Habilidades Musicais Desenvolvidas:</h4>
-      <p>{projeto.habilidadesMusicais}</p>
+      {(projeto.sugestoesAtividades || projeto.habilidadesMusicais) && (
+        <section>
+          <h3>Aplicação didática</h3>
+          {projeto.sugestoesAtividades && (
+            <>
+              <h4>Sugestões de atividades</h4>
+              <p>{projeto.sugestoesAtividades}</p>
+            </>
+          )}
+          {projeto.habilidadesMusicais && (
+            <>
+              <h4>Habilidades musicais desenvolvidas</h4>
+              <p>{projeto.habilidadesMusicais}</p>
+            </>
+          )}
+        </section>
+      )}
 
       {/* Seção de Referências */}
       {projeto.referencias && (
-        <>
-          <h3>Referências:</h3>
+        <section>
+          <h3>Referências</h3>
           <p>{projeto.referencias}</p>
-        </>
+        </section>
       )}
 
-      <p>Adicionado por: {projeto.autor} em {projeto.data}</p>
-
-      {/* Botão de edição aparece apenas se o usuário estiver logado */}
       {isAuthenticated && (
-        <Link to={`/editar-projeto/${id}`}>
-          <button className="edit-button">Editar Projeto</button>
-        </Link>
+        <div className="projeto-detalhes__actions">
+          <Link to={`/editar-projeto/${id}`} className="btn btn-secondary">
+            Editar projeto
+          </Link>
+          <button className="btn btn-danger" onClick={handleDelete} disabled={excluindo}>
+            {excluindo ? "Apagando..." : "Apagar projeto"}
+          </button>
+        </div>
       )}
 
-      {/* Botão de apagar aparece apenas se o usuário estiver logado */}
-      {isAuthenticated && (
-        <button className="delete-button" onClick={handleDelete}>
-          Apagar Projeto
-        </button>
-      )}
-
-      <Link to="/" className="link">← Voltar</Link>
+      <Link to="/" className="projeto-detalhes__back">
+        ← Voltar para projetos
+      </Link>
     </div>
   );
 }

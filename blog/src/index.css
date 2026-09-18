@@ -1,13 +1,142 @@
+/* =========================================================
+   Ensine Música — fundações globais
+   Reset leve, variáveis de marca e tipografia base.
+   ========================================================= */
+
+:root {
+  /* Paleta — inspirada nos instrumentos artesanais da marca */
+  --color-paper: #faf4e9;        /* fundo principal, tom de papel */
+  --color-paper-raised: #fffdf9; /* cartões e superfícies elevadas */
+  --color-ink: #241a30;          /* texto principal */
+  --color-ink-soft: #4a3f59;     /* texto secundário */
+  --color-muted: #7a6f89;        /* texto auxiliar / legendas */
+  --color-line: #e6dac2;         /* linhas e bordas sobre o papel */
+
+  --color-night: #241934;        /* cabeçalho, navegação, rodapé */
+  --color-night-soft: #362849;   /* hover sobre superfícies escuras */
+  --color-night-line: rgba(250, 244, 233, 0.14);
+
+  --color-gold: #d79c2c;         /* ação primária, links */
+  --color-gold-dark: #a97a1d;
+  --color-gold-tint: #f6e6c2;
+
+  --color-clay: #bd5a30;         /* selo "jogo", ações de exclusão */
+  --color-clay-dark: #93441f;
+
+  --color-violet: #6e4f92;       /* selo "instrumento", detalhes */
+  --color-violet-dark: #55397a;
+
+  --font-display: "Fraunces", "Iowan Old Style", ui-serif, serif;
+  --font-body: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+
+  --shadow-card: 0 1px 2px rgba(36, 20, 51, 0.06), 0 10px 28px -14px rgba(36, 20, 51, 0.28);
+  --shadow-pop: 0 18px 40px -18px rgba(36, 20, 51, 0.4);
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  color: var(--color-ink);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 0.5em;
+}
+
+p {
+  margin: 0 0 1em;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* Foco visível e consistente em toda a aplicação */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--color-gold);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+/* Link de acesso rápido ao conteúdo, oculto até receber foco */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  background: var(--color-gold);
+  color: var(--color-night);
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  text-decoration: none;
+  z-index: 1200;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+/* Texto acessível para leitores de tela, oculto visualmente */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

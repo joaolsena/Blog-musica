@@ -19,11 +19,16 @@ function App() {
       {/* Configuração do Router para habilitar o sistema de navegação */}
       <Router>
         <div className="App">
+          <a href="#conteudo-principal" className="skip-link">
+            Pular para o conteúdo
+          </a>
+
           {/* Componentes fixos na página, como o cabeçalho e a barra de navegação */}
           <Header />
           <Navbar />
 
           {/* Configuração das rotas */}
+          <main id="conteudo-principal">
           <Routes>
             {/* Página inicial com a lista de projetos */}
             <Route path="/" element={<Projetos />} />
@@ -57,10 +62,11 @@ function App() {
               } 
             />
           </Routes>
+          </main>
 
           {/* Rodapé da página */}
           <footer>
-            <p>&copy; 1025 Ensine Música. Todos os direitos reservados. Desenvolvido por <a href="mailto:joaolsena129@gmail.com" className="criador">João Sena</a>
+            <p>&copy; 2025 Ensine Música. Todos os direitos reservados. Desenvolvido por <a href="mailto:joaolsena129@gmail.com" className="criador">João Sena</a>
             </p>
           </footer>
         </div>

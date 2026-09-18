@@ -28,14 +28,19 @@ const Login = () => {
     <div className="login-container">
       <h2>Login</h2>
       <form onSubmit={handleSubmit}>
+        <label htmlFor="login-password" className="field-hint">
+          Digite a senha de acesso para gerenciar os projetos
+        </label>
         <input
+          id="login-password"
           type="password"
           placeholder="Digite a senha"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="password-input"  
+          className="password-input"
+          autoFocus
         />
-        <button type="submit" className="login-button">Entrar</button> 
+        <button type="submit" className="login-button">Entrar</button>
       </form>
     </div>
   );

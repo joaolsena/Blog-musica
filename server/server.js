@@ -54,6 +54,7 @@ const Projeto = mongoose.model("Projeto", {
   imagem: String, // URL da imagem principal
   imagensPassoAPasso: [String], // URLs das imagens do passo a passo
   referencias: String,
+  tipoProjeto: { type: String, default: "instrumento" }, // "instrumento" ou "jogo"
   data: String,
 });
 
