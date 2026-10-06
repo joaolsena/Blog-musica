@@ -1,0 +1,10 @@
+# Configuração de publicação do site no Netlify.
+# O Netlify instala as dependências e compila o site a partir do código-fonte,
+# por isso a pasta blog/build não fica no Git.
+[build]
+  base = "blog"
+  command = "npm run build"
+  publish = "build"
+
+# Defina REACT_APP_API_URL (endereço do servidor) nas variáveis de ambiente do
+# site no painel do Netlify: Site configuration > Environment variables.

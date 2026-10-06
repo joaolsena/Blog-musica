@@ -121,14 +121,19 @@ setInterval(() => {
 }, JANELA_TENTATIVAS_MS).unref();
 
 // **Conexão com o MongoDB**
+// (nos testes automáticos MONGO_URI fica vazia e o servidor não se conecta ao banco)
 const mongoURI = process.env.MONGO_URI;
-mongoose
-  .connect(mongoURI, {
-    serverSelectionTimeoutMS: 5000,
-    connectTimeoutMS: 10000,
-  })
-  .then(() => console.log("Conectado ao MongoDB"))
-  .catch((error) => console.error("Erro ao conectar ao MongoDB:", error));
+if (mongoURI) {
+  mongoose
+    .connect(mongoURI, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+    })
+    .then(() => console.log("Conectado ao MongoDB"))
+    .catch((error) => console.error("Erro ao conectar ao MongoDB:", error));
+} else {
+  console.error("MONGO_URI não configurada: o servidor não vai se conectar ao banco.");
+}
 
 // **Configuração do Cloudinary**
 cloudinary.config({
@@ -412,7 +417,13 @@ app.use((erro, req, res, next) => {
 });
 
 // **Servidor**
-const port = process.env.PORT || 4000;
-app.listen(port, () => {
-  console.log(`Servidor rodando na porta ${port}`);
-});
+// Só abre a porta quando executado diretamente (node server.js). Os testes
+// importam o app e sobem o servidor numa porta livre por conta própria.
+if (require.main === module) {
+  const port = process.env.PORT || 4000;
+  app.listen(port, () => {
+    console.log(`Servidor rodando na porta ${port}`);
+  });
+}
+
+module.exports = app;

@@ -1,8 +1,131 @@
-import { render, screen } from '@testing-library/react';
-import App from './App';
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import axios from "axios";
+import App from "./App";
 
-test('renders learn react link', () => {
-  render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+// Simula o servidor: nenhum teste faz requisições de verdade
+jest.mock("axios", () => {
+  const interceptor = { use: jest.fn(), eject: jest.fn() };
+  return {
+    __esModule: true,
+    default: {
+      get: jest.fn(),
+      post: jest.fn(),
+      put: jest.fn(),
+      delete: jest.fn(),
+      defaults: {},
+      interceptors: { request: interceptor, response: interceptor },
+    },
+  };
+});
+
+const PROJETOS = [
+  { _id: "1", titulo: "Chocalho de garrafa", tipoProjeto: "instrumento", autor: "Ana", data: "02/10/2026" },
+  { _id: "2", titulo: "Batalha dos ritmos", tipoProjeto: "jogo", autor: "Lucas", data: "28/09/2026" },
+  { _id: "3", titulo: "Tambor de lata", tipoProjeto: "instrumento", autor: "Júlia", data: "10/09/2026" },
+];
+
+function abrir(caminho) {
+  window.history.pushState({}, "", caminho);
+  return render(<App />);
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  localStorage.clear();
+});
+
+afterEach(() => jest.restoreAllMocks());
+
+// Para testes que simulam falhas de propósito: o componente registra o erro no console
+const silenciarErrosEsperados = () => jest.spyOn(console, "error").mockImplementation(() => {});
+
+describe("página inicial", () => {
+  test("lista os projetos, com o mais recente em destaque", async () => {
+    axios.get.mockResolvedValue({ data: PROJETOS });
+    abrir("/");
+
+    const destaque = await screen.findByRole("region", { name: "Projeto mais recente" });
+    expect(within(destaque).getByText("Chocalho de garrafa")).toBeInTheDocument();
+    expect(screen.getByText("Batalha dos ritmos")).toBeInTheDocument();
+    expect(screen.getByText("Tambor de lata")).toBeInTheDocument();
+  });
+
+  test("filtra por tipo de projeto", async () => {
+    axios.get.mockResolvedValue({ data: PROJETOS });
+    abrir("/");
+    await screen.findByText("Batalha dos ritmos");
+
+    await userEvent.click(screen.getByRole("button", { name: /Jogos/ }));
+
+    expect(screen.getByText("Batalha dos ritmos")).toBeInTheDocument();
+    expect(screen.queryByText("Chocalho de garrafa")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tambor de lata")).not.toBeInTheDocument();
+  });
+
+  test("busca por título ou autor", async () => {
+    axios.get.mockResolvedValue({ data: PROJETOS });
+    abrir("/");
+    await screen.findByText("Batalha dos ritmos");
+
+    await userEvent.type(screen.getByLabelText(/Buscar projetos/), "júlia");
+
+    expect(screen.getByText("Tambor de lata")).toBeInTheDocument();
+    expect(screen.queryByText("Batalha dos ritmos")).not.toBeInTheDocument();
+  });
+
+  test("mostra o estado vazio quando não há projetos", async () => {
+    axios.get.mockResolvedValue({ data: [] });
+    abrir("/");
+    expect(await screen.findByText("Silêncio por enquanto")).toBeInTheDocument();
+  });
+
+  test("avisa quando o servidor não responde", async () => {
+    silenciarErrosEsperados();
+    axios.get.mockRejectedValue(new Error("sem conexão"));
+    abrir("/");
+    expect(await screen.findByText("Fora do tom")).toBeInTheDocument();
+  });
+});
+
+describe("páginas não encontradas", () => {
+  test("endereço inexistente mostra a página 404", () => {
+    abrir("/pagina-que-nao-existe");
+    expect(screen.getByRole("heading", { name: "Esta nota está fora da pauta" })).toBeInTheDocument();
+  });
+
+  test("projeto inexistente mostra 'Projeto não encontrado'", async () => {
+    silenciarErrosEsperados();
+    axios.get.mockRejectedValue({ response: { status: 404 } });
+    abrir("/projeto/6ac53dc9b97f33c7c5f9597f");
+    expect(await screen.findByRole("heading", { name: "Projeto não encontrado" })).toBeInTheDocument();
+  });
+});
+
+describe("login", () => {
+  test("senha incorreta mostra o erro e mantém na tela de login", async () => {
+    axios.post.mockRejectedValue({ response: { status: 401 } });
+    abrir("/login");
+
+    await userEvent.type(screen.getByLabelText("Senha"), "errada");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Senha incorreta");
+    expect(axios.post).toHaveBeenCalledWith("/auth/login", { senha: "errada" });
+  });
+
+  test("muitas tentativas mostram o aviso de bloqueio", async () => {
+    axios.post.mockRejectedValue({ response: { status: 429 } });
+    abrir("/login");
+
+    await userEvent.type(screen.getByLabelText("Senha"), "errada");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Muitas tentativas");
+  });
+
+  test("páginas de professor exigem login", () => {
+    abrir("/adicionar-projeto");
+    expect(screen.getByRole("heading", { name: "Área do professor" })).toBeInTheDocument();
+  });
 });
