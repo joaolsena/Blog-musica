@@ -8,6 +8,11 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 
 - Lista de projetos com busca e filtro por tipo (instrumento ou jogo)
 - Página de cada projeto: materiais, passo a passo com até 20 fotos, vídeos (link do YouTube ou arquivo enviado), instruções de uso e aplicação didática
+- Ficha de cada projeto (para quem é, nível e duração) e filtros por turma, nível e duração na página inicial
+- Versão para imprimir ou salvar em PDF, com os materiais em lista para marcar
+- Prévia própria de cada projeto ao compartilhar o link (título, descrição e foto no WhatsApp, Facebook etc.) e sitemap para o Google
+- Rascunho automático ao cadastrar um projeto: textos, fotos e vídeos voltam se a página recarregar
+- Backup: botão para baixar e restaurar (área do professor) e cópia automática toda segunda-feira no GitHub (branch `backups`)
 - Botão de compartilhar: menu nativo do celular (WhatsApp, Instagram etc.) ou, no computador, WhatsApp, Telegram, Facebook, e-mail e "copiar link"
 - Área do professor, protegida por senha, para publicar, editar e apagar projetos e suas fotos
 - Modo claro e escuro, layout para computador e celular
@@ -116,6 +121,8 @@ Site e servidor ficam no mesmo projeto do Vercel (`ensine-musica`). O `vercel.js
 2. No MongoDB Atlas, em Network Access, libere o acesso de qualquer IP (`0.0.0.0/0`): o Vercel não tem IP fixo.
 3. Publique com `vercel deploy --prod` na raiz do repositório (ou conecte o repositório do GitHub ao projeto para publicar a cada push).
 
+**Backup automático:** `.github/workflows/backup.yml` roda toda segunda-feira às 6h (horário de Belém), baixa os projetos de `/api/projetos` e guarda uma cópia datada na branch `backups`. Para rodar na hora: aba Actions do GitHub > Backup dos projetos > Run workflow. Para restaurar, entre no site como professor > Backup > Restaurar. Se mudar o endereço do site, atualize `SITE` nesse arquivo e a linha `Sitemap:` de `blog/public/robots.txt`.
+
 No Vercel, cada envio ao servidor tem limite de 4,5 MB. Por isso o site reduz as fotos para 2000 px no navegador antes de enviar, e os vídeos vão direto ao Cloudinary.
 
 ## Rotas da API
@@ -133,6 +140,10 @@ Todas começam com `/api`. As marcadas com 🔒 exigem o token de login no cabe�
 | POST | `/upload` 🔒 | Envia uma imagem (JPG/PNG, até 10 MB); uma por requisição |
 | POST | `/videos/assinatura` 🔒 | Autoriza o navegador a enviar um vídeo (até 100 MB) direto ao Cloudinary |
 | POST | `/midias/remover` 🔒 | Apaga imagens e vídeos enviados que não ficaram em nenhum projeto |
+| GET | `/backup` 🔒 | Baixa todos os projetos num arquivo JSON |
+| POST | `/backup/restaurar` 🔒 | Recria, a partir de um backup, os projetos que não existem mais (nunca sobrescreve) |
+
+Fora da API, o servidor também responde `/projeto/:id` (a página do site com título, descrição e foto do projeto para a prévia de links) e `/sitemap.xml`. No Vercel, essas rotas são encaminhadas ao servidor pelo `vercel.json`.
 
 Vídeos aceitos ao salvar: links do YouTube (`https://www.youtube.com/watch?v=...`) ou vídeos da pasta `videos/` desta conta do Cloudinary. Qualquer outro endereço é recusado.
 

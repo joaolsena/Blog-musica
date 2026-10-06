@@ -71,6 +71,8 @@ test("rotas de escrita recusam pedidos sem token", async () => {
     ["POST", "/upload"],
     ["POST", "/videos/assinatura"],
     ["POST", "/midias/remover"],
+    ["GET", "/backup"],
+    ["POST", "/backup/restaurar"],
   ];
   for (const [method, caminho] of pedidos) {
     const resposta = await fetch(base + caminho, { method });
@@ -181,6 +183,31 @@ test("só aceita vídeos do YouTube ou do Cloudinary desta conta", async () => {
     const resposta = await salvar({ videos: [video] });
     assert.equal(resposta.status, 400, video);
   }
+});
+
+test("ficha do projeto só aceita valores conhecidos", async () => {
+  for (const ficha of [{ nivel: "impossivel" }, { duracao: "10" }, { faixasEtarias: ["bebes"] }, { faixasEtarias: "infantil" }]) {
+    const resposta = await salvar(ficha);
+    assert.equal(resposta.status, 400, JSON.stringify(ficha));
+  }
+});
+
+test("restaurar backup recusa arquivo sem lista de projetos", async () => {
+  const resposta = await fetch(`${base}/backup/restaurar`, {
+    method: "POST",
+    headers: { ...comToken(), "Content-Type": "application/json" },
+    body: JSON.stringify({ outra: "coisa" }),
+  });
+  assert.equal(resposta.status, 400);
+});
+
+// A página de projeto usa o build do site (blog/dist); só roda se ele existir
+const temBuild = require("node:fs").existsSync(require("node:path").join(__dirname, "../blog/dist/index.html"));
+test("página de projeto com ID inválido devolve o site com status 404", { skip: !temBuild }, async () => {
+  const resposta = await fetch(`${base.replace(/\/api$/, "")}/projeto/nao-existe`);
+  assert.equal(resposta.status, 404);
+  assert.match(resposta.headers.get("content-type"), /text\/html/);
+  assert.match(await resposta.text(), /<div id="root"><\/div>/);
 });
 
 // Por último: depois dele o IP de teste fica bloqueado por 15 minutos

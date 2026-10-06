@@ -16,7 +16,7 @@ app.set("trust proxy", 1);
 // https://ensine-musica.vercel.app. Sem ela, qualquer origem é aceita — o que é
 // seguro aqui, porque as rotas de escrita exigem o token no cabeçalho.
 app.use(cors(process.env.CORS_ORIGIN ? { origin: process.env.CORS_ORIGIN.split(",").map((o) => o.trim()) } : undefined));
-app.use(express.json());
+app.use(express.json({ limit: "4mb" }));
 
 // Todas as rotas da API ficam em /api, separadas das páginas do site
 const api = express.Router();
@@ -263,6 +263,28 @@ const validarMidias = (req, res, next) => {
   next();
 };
 
+// Ficha do projeto (opcional): para quem é, nível e duração. Usada nos filtros do site.
+const FAIXAS_ETARIAS = ["infantil", "fundamental1", "fundamental2", "medio"];
+const NIVEIS = ["facil", "medio", "desafiador"];
+const DURACOES = ["1", "2", "3+"];
+
+// Confere e normaliza a ficha: listas sem repetição, "" vira "não informado" (null)
+const validarFicha = (req, res, next) => {
+  const corpo = req.body;
+  if (corpo.faixasEtarias !== undefined) {
+    if (!Array.isArray(corpo.faixasEtarias) || !corpo.faixasEtarias.every((f) => FAIXAS_ETARIAS.includes(f))) {
+      return res.status(400).send("Faixa etária inválida.");
+    }
+    corpo.faixasEtarias = FAIXAS_ETARIAS.filter((f) => corpo.faixasEtarias.includes(f));
+  }
+  for (const [campo, permitidos, nome] of [["nivel", NIVEIS, "Nível"], ["duracao", DURACOES, "Duração"]]) {
+    if (corpo[campo] === undefined) continue;
+    if (corpo[campo] === "" || corpo[campo] === null) corpo[campo] = null;
+    else if (!permitidos.includes(corpo[campo])) return res.status(400).send(`${nome} inválido.`);
+  }
+  next();
+};
+
 // **Modelo do MongoDB**
 const Projeto = mongoose.model("Projeto", {
   titulo: String,
@@ -279,6 +301,9 @@ const Projeto = mongoose.model("Projeto", {
   videos: [String], // links do YouTube ou URLs de vídeos no Cloudinary
   referencias: String,
   tipoProjeto: { type: String, default: "instrumento" }, // "instrumento" ou "jogo"
+  faixasEtarias: [String], // FAIXAS_ETARIAS
+  nivel: String, // NIVEIS
+  duracao: String, // DURACOES (em aulas)
   data: String,
 });
 
@@ -309,7 +334,7 @@ api.get("/projetos/:id", async (req, res) => {
 });
 
 // Rota para adicionar um novo projeto (as mídias já chegam como URLs)
-api.post("/adicionar", exigirAdmin, validarMidias, async (req, res) => {
+api.post("/adicionar", exigirAdmin, validarMidias, validarFicha, async (req, res) => {
   try {
     const novoProjeto = new Projeto({ ...req.body, data: req.body.data || dataDeHoje() });
     await novoProjeto.save();
@@ -321,7 +346,7 @@ api.post("/adicionar", exigirAdmin, validarMidias, async (req, res) => {
 });
 
 // Rota para editar um projeto existente
-api.put("/projetos/:id", exigirAdmin, validarMidias, async (req, res) => {
+api.put("/projetos/:id", exigirAdmin, validarMidias, validarFicha, async (req, res) => {
   try {
     const projetoAnterior = await Projeto.findById(req.params.id);
 
@@ -404,7 +429,156 @@ api.post("/midias/remover", exigirAdmin, async (req, res) => {
   }
 });
 
+// **Backup**
+// Baixa todos os projetos num arquivo JSON. As fotos e vídeos continuam no Cloudinary;
+// o backup guarda os endereços deles.
+api.get("/backup", exigirAdmin, async (req, res) => {
+  try {
+    const projetos = await Projeto.find().lean();
+    const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Belem" }); // AAAA-MM-DD
+    res.setHeader("Content-Disposition", `attachment; filename="ensine-musica-backup-${hoje}.json"`);
+    res.json({ site: "Ensine Música", geradoEm: new Date().toISOString(), total: projetos.length, projetos });
+  } catch (error) {
+    console.error("Erro ao gerar backup:", error);
+    res.status(500).send("Erro ao gerar backup");
+  }
+});
+
+// Restaura um backup: recria só os projetos que não existem mais (nunca sobrescreve)
+api.post("/backup/restaurar", exigirAdmin, async (req, res) => {
+  const lista = Array.isArray(req.body) ? req.body : req.body?.projetos;
+  if (!Array.isArray(lista)) {
+    return res.status(400).send("Arquivo de backup inválido: não encontrei a lista de projetos.");
+  }
+  try {
+    const validos = lista.filter(
+      (p) => p && typeof p === "object" && /^[0-9a-f]{24}$/i.test(String(p._id)) && typeof p.titulo === "string"
+    );
+    const existentes = new Set(
+      (await Projeto.find({ _id: { $in: validos.map((p) => p._id) } }, { _id: 1 }).lean()).map((p) => String(p._id))
+    );
+    const novos = validos
+      .filter((p) => !existentes.has(String(p._id)))
+      .map((p) => ({ ...p, videos: (p.videos || []).filter(videoPermitido) }));
+    if (novos.length > 0) await Projeto.insertMany(novos);
+    res.json({ restaurados: novos.length, jaExistiam: existentes.size, ignorados: lista.length - validos.length });
+  } catch (error) {
+    console.error("Erro ao restaurar backup:", error);
+    res.status(500).send("Erro ao restaurar backup");
+  }
+});
+
 app.use("/api", api);
+
+// **Páginas com prévia (WhatsApp, redes sociais e Google)**
+// O site é montado no navegador, mas quem gera a prévia de um link (WhatsApp, Facebook,
+// Google) só lê o HTML. Por isso o endereço de cada projeto passa por aqui (veja
+// vercel.json): devolvemos a mesma página do site com título, descrição e foto do projeto.
+const escaparHtml = (texto) =>
+  String(texto).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+const origemDoSite = (req) => process.env.SITE_URL || `${req.protocol}://${req.get("x-forwarded-host") || req.get("host")}`;
+
+// HTML base do site: lido do build local ou, no Vercel, pedido ao próprio site
+let htmlBase = null;
+let htmlBaseEm = 0;
+async function lerHtmlBase(req) {
+  if (htmlBase && Date.now() - htmlBaseEm < 5 * 60 * 1000) return htmlBase;
+  const arquivoLocal = require("path").join(__dirname, "../blog/dist/index.html");
+  if (require("fs").existsSync(arquivoLocal)) {
+    htmlBase = require("fs").readFileSync(arquivoLocal, "utf8");
+  } else {
+    const resposta = await fetch(`${origemDoSite(req)}/index.html`);
+    if (!resposta.ok) throw new Error(`index.html respondeu ${resposta.status}`);
+    htmlBase = await resposta.text();
+  }
+  htmlBaseEm = Date.now();
+  return htmlBase;
+}
+
+// Troca o conteúdo de uma <meta> (ou a acrescenta, se não existir)
+function trocarMeta(html, atributo, nome, valor) {
+  const tag = `<meta ${atributo}="${nome}" content="${escaparHtml(valor)}" />`;
+  const existente = new RegExp(`<meta ${atributo}="${nome.replace(/[:.]/g, "\\$&")}" content="[^"]*"\\s*/?>`);
+  return existente.test(html) ? html.replace(existente, tag) : html.replace("</head>", `    ${tag}\n  </head>`);
+}
+
+// Descrição curta, cortada numa palavra inteira
+const resumir = (texto, limite = 160) => {
+  const limpo = String(texto || "").replace(/\s+/g, " ").trim();
+  return limpo.length <= limite ? limpo : `${limpo.slice(0, limite).replace(/\s+\S*$/, "")}…`;
+};
+
+// Capa recortada no tamanho que o WhatsApp e as redes usam (1200×630)
+const imagemDePrevia = (url) =>
+  url && url.includes("res.cloudinary.com") && url.includes("/image/upload/")
+    ? url.replace("/image/upload/", "/image/upload/c_fill,g_auto,w_1200,h_630,q_auto,f_jpg/")
+    : null;
+
+function paginaComPrevia(html, projeto, enderecoDaPagina) {
+  const titulo = `${projeto.titulo} — Ensine Música`;
+  const descricao = resumir(projeto.descricaoGeral) || "Projeto de educação musical com materiais alternativos.";
+  const imagem = imagemDePrevia(projeto.imagem);
+  let pagina = html.replace(/<title>[^<]*<\/title>/, `<title>${escaparHtml(titulo)}</title>`);
+  pagina = trocarMeta(pagina, "name", "description", descricao);
+  pagina = trocarMeta(pagina, "property", "og:type", "article");
+  pagina = trocarMeta(pagina, "property", "og:title", projeto.titulo);
+  pagina = trocarMeta(pagina, "property", "og:description", descricao);
+  pagina = trocarMeta(pagina, "property", "og:url", enderecoDaPagina);
+  pagina = trocarMeta(pagina, "property", "og:image:alt", projeto.titulo);
+  if (imagem) pagina = trocarMeta(pagina, "property", "og:image", imagem);
+  return pagina.replace("</head>", `    <link rel="canonical" href="${escaparHtml(enderecoDaPagina)}" />\n  </head>`);
+}
+
+app.get("/projeto/:id", async (req, res) => {
+  let html;
+  try {
+    html = await lerHtmlBase(req);
+  } catch (error) {
+    console.error("Erro ao ler a página base:", error);
+    return res.status(502).send("Página indisponível no momento. Tente de novo em instantes.");
+  }
+  res.type("html");
+  // A CDN guarda por 5 minutos: uma edição aparece na prévia em até 5 minutos
+  res.setHeader("Cache-Control", "public, max-age=0, s-maxage=300, stale-while-revalidate=86400");
+
+  if (!/^[0-9a-f]{24}$/i.test(req.params.id)) return res.status(404).send(html);
+  try {
+    const projeto = await Projeto.findById(req.params.id).lean();
+    if (!projeto) return res.status(404).send(html);
+    res.send(paginaComPrevia(html, projeto, `${origemDoSite(req)}/projeto/${projeto._id}`));
+  } catch (error) {
+    console.error("Erro ao montar a prévia do projeto:", error);
+    res.send(html); // sem a prévia, mas a página funciona normalmente
+  }
+});
+
+// Lista de páginas para o Google encontrar todos os projetos
+const dataISO = (dataBR) => {
+  const [dia, mes, ano] = String(dataBR || "").split("/");
+  return ano && mes && dia ? `${ano}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}` : null;
+};
+
+app.get("/sitemap.xml", async (req, res) => {
+  try {
+    const origem = origemDoSite(req);
+    const projetos = await Projeto.find({}, { _id: 1, data: 1 }).lean();
+    const urls = [
+      `<url><loc>${origem}/</loc></url>`,
+      `<url><loc>${origem}/Ensine-Musica</loc></url>`,
+      ...projetos.map((p) => {
+        const data = dataISO(p.data);
+        return `<url><loc>${origem}/projeto/${p._id}</loc>${data ? `<lastmod>${data}</lastmod>` : ""}</url>`;
+      }),
+    ];
+    res.type("application/xml");
+    res.setHeader("Cache-Control", "public, max-age=0, s-maxage=3600");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>\n`);
+  } catch (error) {
+    console.error("Erro ao gerar o sitemap:", error);
+    res.status(500).send("Erro ao gerar o sitemap");
+  }
+});
 
 // Erros de envio de imagem viram respostas claras em vez de um erro 500 genérico.
 // O Express só reconhece um tratador de erros com 4 parâmetros, por isso o "next" fica mesmo sem uso.

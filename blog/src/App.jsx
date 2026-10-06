@@ -14,6 +14,7 @@ import Footer from "./componentes/Footer"; // Rodapé
 import Projetos from "./componentes/Projetos"; // Página inicial
 import AdicionarProjeto from "./componentes/AdicionarProjeto"; // Página de adicionar projeto
 import EditProjeto from "./componentes/EditProjeto"; // Página de edição do projeto
+import Backup from "./componentes/Backup"; // Backup dos projetos (área do professor)
 import LoginPage from "./componentes/Login"; // Tela de login
 import { AuthProvider } from "./componentes/AuthContext"; // Provedor do contexto de autenticação
 import PrivateRoute from "./componentes/PrivateRoute"; // Componente para proteger rotas privadas
@@ -62,6 +63,16 @@ function Paginas() {
           element={
             <PrivateRoute>
               <EditProjeto />
+            </PrivateRoute>
+          }
+        />
+
+        {/* Página protegida de backup dos projetos */}
+        <Route
+          path="/backup"
+          element={
+            <PrivateRoute>
+              <Backup />
             </PrivateRoute>
           }
         />

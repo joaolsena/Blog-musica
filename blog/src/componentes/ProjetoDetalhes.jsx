@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useAuth } from "./AuthContext"; // Importando o hook de autenticação
 import Lightbox from "./Lightbox";
 import NaoEncontrado from "./NaoEncontrado";
-import { rotuloTipo } from "./tipos";
+import { DURACOES, FAIXAS_ETARIAS, NIVEIS, rotuloTipo } from "./tipos";
 import { srcSetImagem, urlImagem } from "./imagens";
 import VideoProjeto from "./VideoProjeto";
 import { BotaoCompartilhar, ConviteCompartilhar } from "./Compartilhar";
@@ -49,6 +49,45 @@ function VoltarLink() {
       </svg>
       Todos os projetos
     </Link>
+  );
+}
+
+// Ficha do projeto: para quem é, nível e duração (só o que foi informado)
+function Ficha({ projeto }) {
+  const faixas = FAIXAS_ETARIAS.filter((f) => projeto.faixasEtarias?.includes(f.valor)).map((f) => f.curto);
+  const nivel = NIVEIS.find((n) => n.valor === projeto.nivel)?.rotulo;
+  const duracao = DURACOES.find((d) => d.valor === projeto.duracao)?.rotulo;
+  const itens = [
+    faixas.length > 0 && ["Para", faixas.join(" · ")],
+    nivel && ["Nível", nivel],
+    duracao && ["Duração", duracao],
+  ].filter(Boolean);
+  if (itens.length === 0) return null;
+  return (
+    <dl className="ficha">
+      {itens.map(([termo, valor]) => (
+        <div key={termo} className="ficha__item">
+          <dt>{termo}</dt>
+          <dd>{valor}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+// Abre a impressão do navegador, que também permite salvar em PDF.
+// O layout de papel (sem menus, fotos menores, lista de materiais para marcar) fica no App.css.
+function BotaoImprimir() {
+  return (
+    <button type="button" className="btn btn--ghost compartilhar__botao botao-imprimir" onClick={() => window.print()}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M7 8V3.5h10V8" />
+        <rect x="3.5" y="8" width="17" height="8.5" rx="2" />
+        <path d="M7 13.5h10v7H7z" />
+      </svg>
+      Imprimir
+    </button>
   );
 }
 
@@ -221,8 +260,15 @@ function ProjetoDetalhes() {
               </>
             )}
           </p>
-          <BotaoCompartilhar titulo={projeto.titulo} />
+          <div className="artigo__botoes">
+            <BotaoCompartilhar titulo={projeto.titulo} />
+            <BotaoImprimir />
+          </div>
         </div>
+        <Ficha projeto={projeto} />
+        <p className="so-impressao endereco-impresso">
+          Ensine Música · {window.location.origin}/projeto/{id}
+        </p>
       </header>
 
       {projeto.imagem && (
@@ -335,6 +381,13 @@ function ProjetoDetalhes() {
                   />
                 ))}
               </div>
+              <ul className="so-impressao videos-impressos">
+                {projeto.videos.map((url, index) => (
+                  <li key={url}>
+                    {url.includes("youtube.com") ? url : `Vídeo ${index + 1}: assista na página do projeto (endereço abaixo)`}
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
 

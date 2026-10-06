@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from "react";
 import { urlImagem } from "./imagens";
+import { DURACOES, FAIXAS_ETARIAS, NIVEIS } from "./tipos";
 
 // Campo de texto (linha única ou várias linhas) com rótulo e dica
 export function Campo({ id, rotulo, dica, multilinha = false, ...props }) {
@@ -52,6 +53,65 @@ export function TipoProjeto({ valor, onChange, nome = "tipoProjeto" }) {
         ))}
       </div>
     </fieldset>
+  );
+}
+
+// Ficha do projeto: para quem é (várias), nível e duração. Tudo opcional.
+// valor = { faixasEtarias: [], nivel: "", duracao: "" }; onChange(campo, novoValor)
+export function FichaProjeto({ valor, onChange }) {
+  const faixas = valor.faixasEtarias || [];
+  const alternarFaixa = (faixa) =>
+    onChange("faixasEtarias", faixas.includes(faixa) ? faixas.filter((f) => f !== faixa) : [...faixas, faixa]);
+
+  const escolhaUnica = (campo, legenda, opcoes) => (
+    <fieldset className="field">
+      <legend className="field__label">
+        {legenda}
+        <span className="field__optional">opcional</span>
+      </legend>
+      <div className="chips">
+        {[{ valor: "", rotulo: "Não informar" }, ...opcoes].map((opcao) => (
+          <label key={opcao.valor || "nenhum"} className="chip">
+            <input
+              type="radio"
+              name={campo}
+              value={opcao.valor}
+              checked={(valor[campo] || "") === opcao.valor}
+              onChange={() => onChange(campo, opcao.valor)}
+            />
+            {opcao.rotulo}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+
+  return (
+    <>
+      <fieldset className="field">
+        <legend className="field__label">
+          Para quem é
+          <span className="field__optional">opcional</span>
+        </legend>
+        <div className="chips">
+          {FAIXAS_ETARIAS.map((faixa) => (
+            <label key={faixa.valor} className="chip">
+              <input
+                type="checkbox"
+                name="faixasEtarias"
+                value={faixa.valor}
+                checked={faixas.includes(faixa.valor)}
+                onChange={() => alternarFaixa(faixa.valor)}
+              />
+              {faixa.rotulo}
+            </label>
+          ))}
+        </div>
+        <p className="field__hint">Marque todas as turmas em que o projeto funciona bem</p>
+      </fieldset>
+      {escolhaUnica("nivel", "Nível de dificuldade", NIVEIS)}
+      {escolhaUnica("duracao", "Duração", DURACOES)}
+    </>
   );
 }
 

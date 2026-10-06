@@ -174,3 +174,48 @@ describe("projetos guardados no aparelho", () => {
     expect(await screen.findByText(/Sem conexão/)).toBeInTheDocument();
   });
 });
+
+describe("ficha do projeto (turma, nível e duração)", () => {
+  const COM_FICHA = [
+    { ...PROJETOS[0], faixasEtarias: ["infantil", "fundamental1"], nivel: "facil", duracao: "1" },
+    { ...PROJETOS[1], faixasEtarias: ["fundamental2"], nivel: "desafiador", duracao: "2" },
+    { ...PROJETOS[2] }, // sem ficha
+  ];
+
+  test("filtra por nível e mostra o resumo nos cards", async () => {
+    axios.get.mockResolvedValue({ data: COM_FICHA });
+    abrir("/");
+    await screen.findByText("Batalha dos ritmos");
+    expect(screen.getByText("Infantil · Fundamental I · Fácil · 1 aula")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Turma, nível e duração/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Desafiador" }));
+
+    expect(screen.getByText("Batalha dos ritmos")).toBeInTheDocument();
+    expect(screen.queryByText("Chocalho de garrafa")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tambor de lata")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Limpar" }));
+    expect(screen.getByText("Tambor de lata")).toBeInTheDocument();
+  });
+
+  test("sem nenhuma ficha preenchida, os filtros nem aparecem", async () => {
+    axios.get.mockResolvedValue({ data: PROJETOS });
+    abrir("/");
+    await screen.findByText("Batalha dos ritmos");
+    expect(screen.queryByRole("button", { name: /Turma, nível e duração/ })).not.toBeInTheDocument();
+  });
+
+  test("a página do projeto mostra a ficha e o botão de imprimir", async () => {
+    axios.get.mockResolvedValue({ data: COM_FICHA[0] });
+    abrir("/projeto/1");
+
+    expect(await screen.findByText("Infantil · Fundamental I")).toBeInTheDocument();
+    expect(screen.getByText("Fácil")).toBeInTheDocument();
+    expect(screen.getByText("1 aula")).toBeInTheDocument();
+
+    const imprimir = vi.spyOn(window, "print").mockImplementation(() => {});
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(imprimir).toHaveBeenCalled();
+  });
+});

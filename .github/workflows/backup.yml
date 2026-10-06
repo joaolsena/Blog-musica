@@ -1,0 +1,68 @@
+# Backup semanal dos projetos do Ensine Música.
+#
+# Toda segunda-feira às 6h (horário de Belém), baixa a lista pública de projetos do
+# site e guarda uma cópia datada na branch "backups" deste repositório. Também dá para
+# rodar na hora: aba Actions > Backup dos projetos > Run workflow.
+#
+# O arquivo tem os textos dos projetos e os endereços das fotos e vídeos (que ficam no
+# Cloudinary). Para restaurar: entre no site como professor > Backup > Restaurar.
+# Se o GitHub não conseguir falar com o site, a execução falha e o GitHub avisa por e-mail.
+
+name: Backup dos projetos
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # segunda, 09:00 UTC = 06:00 em Belém
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      SITE: https://ensine-musica.vercel.app
+    steps:
+      - name: Baixar os projetos do site
+        run: |
+          curl --fail --silent --show-error --retry 3 --retry-delay 10 --max-time 60 \
+            "$SITE/api/projetos" -o projetos.json
+          # Confere que veio uma lista de projetos (e não uma página de erro)
+          TOTAL=$(python3 -c 'import json; d = json.load(open("projetos.json")); assert isinstance(d, list); print(len(d))')
+          echo "TOTAL=$TOTAL" >> "$GITHUB_ENV"
+          echo "Projetos baixados: $TOTAL"
+
+      - name: Guardar na branch backups
+        run: |
+          git init -q repo && cd repo
+          git config user.name "Backup automático"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          if git fetch -q --depth 1 origin backups; then
+            git checkout -q -b backups FETCH_HEAD
+          else
+            git checkout -q --orphan backups
+            printf '# Backups do Ensine Música\n\nCópias semanais dos projetos (veja .github/workflows/backup.yml na branch main).\n' > README.md
+          fi
+          HOJE=$(TZ=America/Belem date +%F)
+          mkdir -p backups
+          python3 -c "
+          import json, datetime
+          projetos = json.load(open('../projetos.json'))
+          backup = {'site': 'Ensine Música', 'geradoEm': datetime.datetime.utcnow().isoformat() + 'Z', 'total': len(projetos), 'projetos': projetos}
+          json.dump(backup, open('backups/$HOJE.json', 'w'), ensure_ascii=False, indent=1)
+          "
+          cp "backups/$HOJE.json" ultimo-backup.json
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nada mudou desde o último backup."
+          else
+            git commit -q -m "Backup de $HOJE ($TOTAL projetos)"
+            git push -q origin backups
+            echo "Backup de $HOJE salvo com $TOTAL projetos."
+          fi

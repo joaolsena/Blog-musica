@@ -88,6 +88,9 @@ function Navbar() {
                     </svg>
                     Novo projeto
                   </Link>
+                  <NavLink to="/backup" className="nav-link nav-link--quiet">
+                    Backup
+                  </NavLink>
                   <button
                     type="button"
                     className="btn btn--ghost btn--sm"
@@ -150,6 +153,11 @@ function Navbar() {
                 </NavLink>
               </li>
               <li style={{ "--i": links.length + 1 }}>
+                <NavLink to="/backup" className="mobile-menu__link">
+                  Backup
+                </NavLink>
+              </li>
+              <li style={{ "--i": links.length + 2 }}>
                 <button
                   type="button"
                   className="mobile-menu__link"

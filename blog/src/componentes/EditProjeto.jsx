@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
-import { Campo, EnvioImagens, ImagensAtuais, TipoProjeto } from "./CamposFormulario";
+import { Campo, EnvioImagens, FichaProjeto, ImagensAtuais, TipoProjeto } from "./CamposFormulario";
 import {
   FORMATOS_ACEITOS,
   LIMITE_IMAGENS_PASSO,
@@ -32,6 +32,9 @@ function EditProjeto() {
     autor: "",
     referencias: "",
     tipoProjeto: "instrumento",
+    faixasEtarias: [],
+    nivel: "",
+    duracao: "",
   });
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -185,6 +188,10 @@ function EditProjeto() {
               multilinha
             />
             <TipoProjeto valor={projeto.tipoProjeto} onChange={handleChange} />
+            <FichaProjeto
+              valor={projeto}
+              onChange={(campo, valor) => setProjeto((anterior) => ({ ...anterior, [campo]: valor }))}
+            />
           </div>
         </section>
 

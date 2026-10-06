@@ -6,7 +6,7 @@
 // - Lista e projetos (/api/projetos): busca na rede; sem conexão, usa a última resposta.
 // As imagens do Cloudinary não são guardadas: o navegador já faz o cache delas.
 
-const VERSAO = "v1";
+const VERSAO = "v2";
 const CACHE_APP = `ensine-musica-app-${VERSAO}`;
 const CACHE_DADOS = `ensine-musica-dados-${VERSAO}`;
 
@@ -50,6 +50,17 @@ async function primeiroRede(pedido, nomeCache, chave = pedido) {
   }
 }
 
+// Outras páginas: da rede; sem conexão, a página base guardada (o React monta o resto)
+async function paginaOuBase(pedido) {
+  try {
+    return await fetch(pedido);
+  } catch (erro) {
+    const base = await caches.match("/", { cacheName: CACHE_APP });
+    if (base) return base;
+    throw erro;
+  }
+}
+
 async function primeiroCache(pedido, nomeCache) {
   const cache = await caches.open(nomeCache);
   const guardada = await cache.match(pedido);
@@ -65,9 +76,10 @@ self.addEventListener("fetch", (evento) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Todas as páginas são o mesmo index.html (o React escolhe o conteúdo pela URL)
+  // Todas as páginas são o mesmo site (o React escolhe o conteúdo pela URL). Só a página
+  // inicial é guardada como base: a de um projeto vem com título e foto dele na prévia.
   if (request.mode === "navigate") {
-    evento.respondWith(primeiroRede(request, CACHE_APP, "/"));
+    evento.respondWith(url.pathname === "/" ? primeiroRede(request, CACHE_APP, "/") : paginaOuBase(request));
   } else if (url.pathname.startsWith("/assets/")) {
     evento.respondWith(primeiroCache(request, CACHE_APP));
   } else if (url.pathname.startsWith("/api/projetos")) {

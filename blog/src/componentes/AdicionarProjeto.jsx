@@ -1,8 +1,8 @@
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { Campo, EnvioImagens, TipoProjeto } from "./CamposFormulario";
+import { Campo, EnvioImagens, FichaProjeto, TipoProjeto } from "./CamposFormulario";
 import CampoVideos, { urlsFinais } from "./CampoVideos";
 import {
   FORMATOS_ACEITOS,
@@ -13,6 +13,8 @@ import {
   removerMidias,
   tamanhosValidos,
 } from "./envioMidias";
+import { quandoFoiSalvo } from "./memoria";
+import { apagarRascunho, lerRascunho, salvarRascunho } from "./rascunho";
 
 const projetoVazio = {
   titulo: "",
@@ -27,6 +29,9 @@ const projetoVazio = {
   autor: "",
   imagem: "",
   tipoProjeto: "instrumento",
+  faixasEtarias: [],
+  nivel: "",
+  duracao: "",
   referencias: "",
   imagensPassoAPasso: [], // URLs das imagens do passo a passo
 };
@@ -40,10 +45,65 @@ function AdicionarProjeto() {
   const enviandoRef = useRef(false);
   const navigate = useNavigate();
 
+  // Rascunho automático: volta ao abrir o formulário e é salvo enquanto a pessoa preenche
+  const [rascunhoCarregado, setRascunhoCarregado] = useState(false);
+  const [rascunhoSalvoEm, setRascunhoSalvoEm] = useState(null);
+
+  const descartarRascunho = useCallback(() => {
+    apagarRascunho();
+    setNovoProjeto(projetoVazio);
+    setImagemPrincipal([]);
+    setImagensPasso([]);
+    setVideos([]);
+    setRascunhoSalvoEm(null);
+  }, []);
+
+  useEffect(() => {
+    let ativo = true;
+    lerRascunho().then((rascunho) => {
+      if (!ativo) return;
+      if (rascunho) {
+        setNovoProjeto({ ...projetoVazio, ...rascunho.campos });
+        setImagemPrincipal(rascunho.imagemPrincipal || []);
+        setImagensPasso(rascunho.imagensPasso || []);
+        setVideos(rascunho.videos || []);
+        setRascunhoSalvoEm(rascunho.salvoEm);
+        toast("Rascunho recuperado", {
+          description: `Você continua de onde parou (salvo ${quandoFoiSalvo(rascunho.salvoEm)}).`,
+          action: { label: "Descartar", onClick: descartarRascunho },
+        });
+      }
+      setRascunhoCarregado(true);
+    });
+    return () => {
+      ativo = false;
+    };
+  }, [descartarRascunho]);
+
+  useEffect(() => {
+    if (!rascunhoCarregado || enviandoRef.current) return undefined;
+    const temConteudo =
+      Object.entries(novoProjeto).some(
+        ([campo, valor]) => campo !== "tipoProjeto" && (Array.isArray(valor) ? valor.length > 0 : Boolean(valor))
+      ) ||
+      imagemPrincipal.length > 0 ||
+      imagensPasso.length > 0 ||
+      videos.length > 0;
+    if (!temConteudo) return undefined;
+    // Espera a pessoa parar de digitar por um instante antes de salvar
+    const temporizador = setTimeout(async () => {
+      const salvoEm = await salvarRascunho({ campos: novoProjeto, imagemPrincipal, imagensPasso, videos });
+      if (salvoEm && !enviandoRef.current) setRascunhoSalvoEm(salvoEm);
+    }, 600);
+    return () => clearTimeout(temporizador);
+  }, [rascunhoCarregado, novoProjeto, imagemPrincipal, imagensPasso, videos]);
+
   const atualizar = (e) => {
     const { name, value } = e.target;
     setNovoProjeto((anterior) => ({ ...anterior, [name]: value }));
   };
+
+  const atualizarFicha = (campo, valor) => setNovoProjeto((anterior) => ({ ...anterior, [campo]: valor }));
 
   const handleAdicionarProjeto = async (e) => {
     e.preventDefault();
@@ -76,6 +136,7 @@ function AdicionarProjeto() {
         videos: urlsFinais(videos, midias.urlsVideos),
       });
 
+      await apagarRascunho();
       toast.success("Projeto publicado!", { id: aviso });
       navigate(projetoSalvo?._id ? `/projeto/${projetoSalvo._id}` : "/");
     } catch (error) {
@@ -141,6 +202,7 @@ function AdicionarProjeto() {
               required
             />
             <TipoProjeto valor={novoProjeto.tipoProjeto} onChange={atualizar} />
+            <FichaProjeto valor={novoProjeto} onChange={atualizarFicha} />
           </div>
         </section>
 
@@ -281,6 +343,14 @@ function AdicionarProjeto() {
         </section>
 
         <div className="form__submit">
+          {rascunhoSalvoEm && (
+            <p className="rascunho-status" aria-live="polite">
+              Rascunho salvo neste aparelho {quandoFoiSalvo(rascunhoSalvoEm)}
+              <button type="button" className="rascunho-status__descartar" onClick={descartarRascunho}>
+                Descartar
+              </button>
+            </p>
+          )}
           <button type="submit" className="btn btn--primary btn--lg" disabled={enviando}>
             {enviando ? "Publicando…" : "Publicar projeto"}
           </button>

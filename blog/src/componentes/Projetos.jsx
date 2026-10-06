@@ -3,7 +3,7 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import Pauta from "./Pauta";
 import RevealOnScroll from "./RevealOnScroll";
-import { rotuloTipo } from "./tipos";
+import { DURACOES, FAIXAS_ETARIAS, NIVEIS, resumoDaFicha, rotuloTipo } from "./tipos";
 import { srcSetImagem, urlImagem } from "./imagens";
 import { lerProjetosSalvos, salvarProjetos } from "./memoria";
 import { AvisoSincronia, useSincronia } from "./Sincronia";
@@ -100,6 +100,88 @@ function CapaProjeto({ projeto, sizes, prioridade = false }) {
   );
 }
 
+// "Fundamental I · Fácil · 1 aula" nos cards (só o que foi informado)
+function ResumoFicha({ projeto }) {
+  const itens = resumoDaFicha(projeto);
+  if (itens.length === 0) return null;
+  return <p className="card__ficha">{itens.join(" · ")}</p>;
+}
+
+// Filtros da ficha: para quem é, nível e duração (um valor de cada; tocar de novo desmarca)
+const GRUPOS_FICHA = [
+  { campo: "faixa", titulo: "Para quem é", opcoes: FAIXAS_ETARIAS.map((f) => ({ valor: f.valor, rotulo: f.curto })) },
+  { campo: "nivel", titulo: "Nível", opcoes: NIVEIS },
+  { campo: "duracao", titulo: "Duração", opcoes: DURACOES },
+];
+const FICHA_VAZIA = { faixa: "", nivel: "", duracao: "" };
+
+const combinaFicha = (projeto, ficha) =>
+  (!ficha.faixa || projeto.faixasEtarias?.includes(ficha.faixa)) &&
+  (!ficha.nivel || projeto.nivel === ficha.nivel) &&
+  (!ficha.duracao || projeto.duracao === ficha.duracao);
+
+function FiltrosFicha({ ficha, onChange, aberto, onAlternar }) {
+  const ativos = Object.values(ficha).filter(Boolean).length;
+  return (
+    <div className="filtros-ficha">
+      <div className="filtros-ficha__barra">
+        <button
+          type="button"
+          className="filtros-ficha__botao"
+          aria-expanded={aberto}
+          aria-controls="filtros-ficha-painel"
+          onClick={onAlternar}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+            strokeLinecap="round" aria-hidden="true">
+            <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+            <circle cx="16" cy="7" r="2" />
+            <circle cx="10" cy="17" r="2" />
+          </svg>
+          Turma, nível e duração
+          {ativos > 0 && <span className="filtros-ficha__contagem">{ativos}</span>}
+          <svg className="filtros-ficha__seta" width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        {ativos > 0 && (
+          <button type="button" className="filtros-ficha__limpar" onClick={() => onChange(FICHA_VAZIA)}>
+            Limpar
+          </button>
+        )}
+      </div>
+      <div id="filtros-ficha-painel" className="filtros-ficha__painel" data-aberto={aberto} inert={aberto ? undefined : ""}>
+        <div className="filtros-ficha__conteudo">
+          <div className="filtros-ficha__grade">
+            {GRUPOS_FICHA.map((grupo) => (
+              <div key={grupo.campo} className="filtros-ficha__grupo" role="group" aria-label={grupo.titulo}>
+                <p className="filtros-ficha__titulo">{grupo.titulo}</p>
+                <div className="chips chips--compactas">
+                  {grupo.opcoes.map((opcao) => {
+                    const marcado = ficha[grupo.campo] === opcao.valor;
+                    return (
+                      <button
+                        key={opcao.valor}
+                        type="button"
+                        className="chip"
+                        aria-pressed={marcado}
+                        onClick={() => onChange({ ...ficha, [grupo.campo]: marcado ? "" : opcao.valor })}
+                      >
+                        {opcao.rotulo}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProjetoCard({ projeto }) {
   return (
     <article className="card">
@@ -115,6 +197,7 @@ function ProjetoCard({ projeto }) {
             <span>{projeto.titulo}</span>
           </h3>
           {projeto.descricaoGeral && <p className="card__excerpt">{projeto.descricaoGeral}</p>}
+          <ResumoFicha projeto={projeto} />
           <p className="card__meta">
             {projeto.autor}
             {projeto.data && <span aria-hidden="true"> · </span>}
@@ -140,6 +223,7 @@ function Destaque({ projeto }) {
           )}
           <h2 className="destaque__title">{projeto.titulo}</h2>
           {projeto.descricaoGeral && <p className="destaque__excerpt">{projeto.descricaoGeral}</p>}
+          <ResumoFicha projeto={projeto} />
           <p className="card__meta">
             {projeto.autor}
             {projeto.data && <span aria-hidden="true"> · </span>}
@@ -212,6 +296,8 @@ function Projetos() {
   const [erro, setErro] = useState(null);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("todos");
+  const [ficha, setFicha] = useState(FICHA_VAZIA);
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   const [salvoEm, setSalvoEm] = useState(salvos?.salvoEm);
   const sincronia = useSincronia();
   const { iniciar, concluir } = sincronia;
@@ -257,13 +343,17 @@ function Projetos() {
         !termo ||
         projeto.titulo?.toLowerCase().includes(termo) ||
         projeto.autor?.toLowerCase().includes(termo);
-      return combinaFiltro && combinaBusca;
+      return combinaFiltro && combinaBusca && combinaFicha(projeto, ficha);
     });
-  }, [projetos, busca, filtro]);
+  }, [projetos, busca, filtro, ficha]);
+
+  // Os filtros da ficha só aparecem quando algum projeto tem a ficha preenchida
+  const temFicha = projetos.some((p) => p.faixasEtarias?.length > 0 || p.nivel || p.duracao);
+  const fichaAtiva = Object.values(ficha).some(Boolean);
 
   // O destaque só aparece na visão padrão (sem busca e sem filtro ativo),
   // para não duplicar o mesmo card quando a lista já está filtrada.
-  const mostrarDestaque = !busca && filtro === "todos" && projetosFiltrados.length > 1;
+  const mostrarDestaque = !busca && filtro === "todos" && !fichaAtiva && projetosFiltrados.length > 1;
   const destaque = mostrarDestaque ? projetosFiltrados[0] : null;
   const restante = mostrarDestaque ? projetosFiltrados.slice(1) : projetosFiltrados;
   const temProjetos = !carregando && !erro && projetos.length > 0;
@@ -321,6 +411,15 @@ function Projetos() {
           )}
         </div>
 
+        {temProjetos && temFicha && (
+          <FiltrosFicha
+            ficha={ficha}
+            onChange={setFicha}
+            aberto={filtrosAbertos}
+            onAlternar={() => setFiltrosAbertos((aberto) => !aberto)}
+          />
+        )}
+
         {carregando && <Esqueleto />}
 
         {!carregando && erro && (
@@ -345,7 +444,7 @@ function Projetos() {
         {temProjetos && projetosFiltrados.length === 0 && (
           <Silencio
             titulo="Nenhum projeto encontrado"
-            texto="Tente outro termo de busca ou outra categoria."
+            texto="Tente outro termo de busca, outra categoria ou outros filtros."
             acao={
               <button
                 type="button"
@@ -353,6 +452,7 @@ function Projetos() {
                 onClick={() => {
                   setBusca("");
                   setFiltro("todos");
+                  setFicha(FICHA_VAZIA);
                 }}
               >
                 Limpar filtros

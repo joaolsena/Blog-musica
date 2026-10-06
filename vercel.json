@@ -6,6 +6,8 @@
   "regions": ["gru1"],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/projeto/:id", "destination": "/api" },
+    { "source": "/sitemap.xml", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
@@ -13,5 +15,8 @@
       "source": "/assets/(.*)",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": { "backups": false }
+  }
 }
