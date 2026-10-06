@@ -4,13 +4,105 @@ const mongoose = require("mongoose");
 const cloudinary = require("cloudinary").v2;
 const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const crypto = require("crypto");
 require("dotenv").config();
 
 const app = express();
 
+// Em produção o servidor fica atrás de um proxy; isso faz req.ip ser o IP real do visitante
+app.set("trust proxy", 1);
+
 // **Middleware**
 app.use(cors());
 app.use(express.json());
+
+// **Autenticação do professor**
+// A senha fica só no servidor (variável ADMIN_PASSWORD). Quem acerta a senha recebe um
+// token assinado com TOKEN_SECRET, que precisa ser enviado no cabeçalho Authorization
+// em toda rota que cria, edita ou apaga algo.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const TOKEN_SECRET = process.env.TOKEN_SECRET;
+const DURACAO_TOKEN_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
+const autenticacaoConfigurada = Boolean(ADMIN_PASSWORD && TOKEN_SECRET);
+
+if (!autenticacaoConfigurada) {
+  console.error("ADMIN_PASSWORD e TOKEN_SECRET não configurados: criar, editar e apagar projetos está desativado.");
+}
+
+const assinar = (dados) => crypto.createHmac("sha256", TOKEN_SECRET).update(dados).digest("base64url");
+
+// Compara textos em tempo constante (evita descobrir a senha medindo o tempo de resposta)
+const iguais = (a, b) => {
+  const hashA = crypto.createHash("sha256").update(String(a)).digest();
+  const hashB = crypto.createHash("sha256").update(String(b)).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+};
+
+const criarToken = () => {
+  const expiraEm = Date.now() + DURACAO_TOKEN_MS;
+  const dados = Buffer.from(JSON.stringify({ exp: expiraEm })).toString("base64url");
+  return { token: `${dados}.${assinar(dados)}`, expiraEm };
+};
+
+const tokenValido = (token) => {
+  if (!autenticacaoConfigurada || typeof token !== "string") return false;
+  const [dados, assinatura] = token.split(".");
+  if (!dados || !assinatura || !iguais(assinatura, assinar(dados))) return false;
+  try {
+    const { exp } = JSON.parse(Buffer.from(dados, "base64url").toString());
+    return typeof exp === "number" && exp > Date.now();
+  } catch {
+    return false;
+  }
+};
+
+// Protege as rotas de escrita. Fica antes do multer, para que um envio sem
+// permissão seja recusado antes de qualquer imagem subir para o Cloudinary.
+const exigirAdmin = (req, res, next) => {
+  if (!autenticacaoConfigurada) {
+    return res.status(503).send("Autenticação não configurada no servidor");
+  }
+  const token = (req.get("Authorization") || "").replace(/^Bearer /, "");
+  if (!tokenValido(token)) {
+    return res.status(401).send("Acesso não autorizado");
+  }
+  next();
+};
+
+// Limite de tentativas de login por IP: 5 erros a cada 15 minutos
+const LIMITE_TENTATIVAS = 5;
+const JANELA_TENTATIVAS_MS = 15 * 60 * 1000;
+const tentativasPorIp = new Map();
+
+app.post("/auth/login", (req, res) => {
+  if (!autenticacaoConfigurada) {
+    return res.status(503).send("Autenticação não configurada no servidor");
+  }
+
+  const agora = Date.now();
+  const registro = tentativasPorIp.get(req.ip);
+  if (registro && registro.reiniciaEm > agora && registro.erros >= LIMITE_TENTATIVAS) {
+    res.set("Retry-After", Math.ceil((registro.reiniciaEm - agora) / 1000));
+    return res.status(429).send("Muitas tentativas. Tente novamente mais tarde.");
+  }
+
+  const senha = req.body?.senha;
+  if (typeof senha === "string" && iguais(senha, ADMIN_PASSWORD)) {
+    tentativasPorIp.delete(req.ip);
+    return res.json(criarToken());
+  }
+
+  const atual = registro && registro.reiniciaEm > agora ? registro : { erros: 0, reiniciaEm: agora + JANELA_TENTATIVAS_MS };
+  atual.erros += 1;
+  tentativasPorIp.set(req.ip, atual);
+  res.status(401).send("Senha incorreta");
+});
+
+// Limpa registros de tentativas vencidos, para o mapa não crescer para sempre
+setInterval(() => {
+  const agora = Date.now();
+  tentativasPorIp.forEach((registro, ip) => registro.reiniciaEm <= agora && tentativasPorIp.delete(ip));
+}, JANELA_TENTATIVAS_MS).unref();
 
 // **Conexão com o MongoDB**
 const mongoURI = process.env.MONGO_URI;
@@ -110,7 +202,7 @@ app.get("/projetos/:id", async (req, res) => {
 });
 
 // Rota para adicionar um novo projeto
-app.post("/adicionar", upload.single("imagem"), async (req, res) => {
+app.post("/adicionar", exigirAdmin, upload.single("imagem"), async (req, res) => {
   try {
     // Criar o objeto de projeto a partir do corpo da requisição
     const projetoData = { ...req.body, data: req.body.data || new Date().toLocaleDateString("pt-BR") };
@@ -132,7 +224,7 @@ app.post("/adicionar", upload.single("imagem"), async (req, res) => {
 });
 
 // Rota para editar um projeto existente
-app.put("/projetos/:id", upload.single("imagem"), async (req, res) => {
+app.put("/projetos/:id", exigirAdmin, upload.single("imagem"), async (req, res) => {
   try {
     const projetoData = { ...req.body };
 
@@ -161,7 +253,7 @@ app.put("/projetos/:id", upload.single("imagem"), async (req, res) => {
 });
 
 // Rota para excluir um projeto
-app.delete("/projetos/:id", async (req, res) => {
+app.delete("/projetos/:id", exigirAdmin, async (req, res) => {
   try {
     const projetoRemovido = await Projeto.findByIdAndDelete(req.params.id);
 
@@ -179,7 +271,7 @@ app.delete("/projetos/:id", async (req, res) => {
 });
 
 // Rota para upload de imagem principal
-app.post("/upload", upload.single("imagem"), (req, res) => {
+app.post("/upload", exigirAdmin, upload.single("imagem"), (req, res) => {
   try {
     const imagemUrl = req.file.path; // URL do Cloudinary
     res.status(200).json({ url: imagemUrl });
@@ -190,7 +282,7 @@ app.post("/upload", upload.single("imagem"), (req, res) => {
 });
 
 // Rota para upload de imagens múltiplas (passo a passo)
-app.post("/upload-multiplas", upload.array("imagensPassoAPasso", 4), async (req, res) => {
+app.post("/upload-multiplas", exigirAdmin, upload.array("imagensPassoAPasso", 4), async (req, res) => {
   try {
     // Verifique se os arquivos foram enviados
     const imagens = req.files ? req.files.map((file) => file.path) : [];
@@ -220,7 +312,7 @@ app.post("/upload-multiplas", upload.array("imagensPassoAPasso", 4), async (req,
 });
 
 // Rota para remover imagens enviadas cujo projeto não chegou a ser salvo
-app.post("/imagens/remover", async (req, res) => {
+app.post("/imagens/remover", exigirAdmin, async (req, res) => {
   try {
     const urls = Array.isArray(req.body.urls) ? req.body.urls.filter((url) => typeof url === "string") : [];
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import axios from "axios";
 import { toast } from "sonner";
 import { Campo, TipoProjeto } from "./CamposFormulario";
 
@@ -50,15 +51,8 @@ function EditProjeto() {
     e.preventDefault();
     setSalvando(true);
     try {
-      const response = await fetch(`/projetos/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(projeto),
-      });
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      // axios envia o token de acesso automaticamente (ver AuthContext)
+      await axios.put(`/projetos/${id}`, projeto);
       toast.success("Alterações salvas.");
       navigate(`/projeto/${id}`);
     } catch (error) {

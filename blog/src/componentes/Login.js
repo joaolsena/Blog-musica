@@ -6,22 +6,34 @@ import { LogoMark } from "./Logo";
 
 const Login = () => {
   const [password, setPassword] = useState("");
-  const [erro, setErro] = useState(false);
+  const [erro, setErro] = useState(null); // mensagem de erro exibida abaixo do campo
+  const [entrando, setEntrando] = useState(false);
   const [tremendo, setTremendo] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (entrando) return;
 
-    // Tenta realizar o login
-    if (login(password)) {
+    // A senha é conferida pelo servidor
+    setEntrando(true);
+    const resultado = await login(password);
+    setEntrando(false);
+
+    if (resultado === "ok") {
       toast.success("Bem-vindo de volta!");
       navigate("/"); // Redireciona para a página inicial após o login
-    } else {
-      setErro(true);
-      setTremendo(true);
+      return;
     }
+
+    setErro(
+      {
+        "senha-incorreta": "Senha incorreta. Tente novamente.",
+        bloqueado: "Muitas tentativas erradas. Aguarde 15 minutos e tente de novo.",
+      }[resultado] || "Não foi possível entrar agora. Tente novamente em instantes."
+    );
+    setTremendo(true);
   };
 
   return (
@@ -46,24 +58,24 @@ const Login = () => {
             value={password}
             onChange={(e) => {
               setPassword(e.target.value);
-              setErro(false);
+              setErro(null);
             }}
             autoComplete="current-password"
             enterKeyHint="go"
             required
             autoFocus
-            aria-invalid={erro || undefined}
+            aria-invalid={Boolean(erro) || undefined}
             aria-describedby={erro ? "login-erro" : undefined}
           />
           {erro && (
             <p id="login-erro" className="field__error" role="alert">
-              Senha incorreta. Tente novamente.
+              {erro}
             </p>
           )}
         </div>
 
-        <button type="submit" className="btn btn--primary btn--block">
-          Entrar
+        <button type="submit" className="btn btn--primary btn--block" disabled={entrando}>
+          {entrando ? "Entrando…" : "Entrar"}
         </button>
       </form>
     </div>
