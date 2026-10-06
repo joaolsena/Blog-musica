@@ -15,7 +15,7 @@ Site: [ensinemusica.netlify.app](https://ensinemusica.netlify.app)
 
 | Parte | Tecnologias |
 | --- | --- |
-| Site (`blog/`) | React 18, Vite, React Router, Axios, Sonner (avisos) |
+| Site (`blog/`) | React 18, Vite 7, React Router, Axios, Sonner (avisos) |
 | Servidor (`server/`) | Node.js 22, Express, Mongoose, Multer |
 | Banco de dados | MongoDB Atlas |
 | Imagens | Cloudinary |
@@ -41,7 +41,7 @@ netlify.toml           como o Netlify compila o site
 
 ## Como rodar no computador
 
-Requisitos: Node.js 22 e npm.
+Requisitos: Node.js 22.12 ou mais novo (exigência do Vite 7) e npm.
 
 **1. Servidor**
 
