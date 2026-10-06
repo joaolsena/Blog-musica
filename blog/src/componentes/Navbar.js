@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import Logo from "./Logo";
+import { BotaoTema } from "./Tema";
 
 function Navbar() {
   const { isAuthenticated, logout } = useAuth();
@@ -102,17 +103,20 @@ function Navbar() {
             </div>
           </nav>
 
-          <button
-            type="button"
-            className="menu-toggle"
-            aria-label={menuAberto ? "Fechar menu" : "Abrir menu"}
-            aria-expanded={menuAberto}
-            aria-controls="menu-mobile"
-            onClick={() => setMenuAberto((aberto) => !aberto)}
-          >
-            <span />
-            <span />
-          </button>
+          <div className="header__end">
+            <BotaoTema />
+            <button
+              type="button"
+              className="menu-toggle"
+              aria-label={menuAberto ? "Fechar menu" : "Abrir menu"}
+              aria-expanded={menuAberto}
+              aria-controls="menu-mobile"
+              onClick={() => setMenuAberto((aberto) => !aberto)}
+            >
+              <span />
+              <span />
+            </button>
+          </div>
         </div>
       </header>
 

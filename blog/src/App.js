@@ -1,5 +1,10 @@
 import React, { useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useLocation,
+} from "react-router-dom";
 import { Toaster } from "sonner";
 import "./App.css";
 import ProjetoDetalhes from "./componentes/ProjetoDetalhes"; // Página de detalhes
@@ -12,6 +17,7 @@ import EditProjeto from "./componentes/EditProjeto"; // Página de edição do p
 import LoginPage from "./componentes/Login"; // Tela de login
 import { AuthProvider } from "./componentes/AuthContext"; // Provedor do contexto de autenticação
 import PrivateRoute from "./componentes/PrivateRoute"; // Componente para proteger rotas privadas
+import { TemaProvider, useTema } from "./componentes/Tema"; // Tema claro/escuro
 
 // Conteúdo das rotas. Fica separado do App porque precisa estar dentro do Router
 // para usar useLocation.
@@ -63,33 +69,43 @@ function Paginas() {
   );
 }
 
+// Avisos (Sonner) seguindo o tema escolhido no site
+function Avisos() {
+  const { tema } = useTema();
+  return (
+    <Toaster
+      position="bottom-center"
+      theme={tema}
+      toastOptions={{ className: "toast" }}
+      offset={24}
+    />
+  );
+}
+
 function App() {
   return (
     // Envolve toda a aplicação com o contexto de autenticação
-    <AuthProvider>
-      <Router>
-        <div className="app">
-          <a href="#conteudo-principal" className="skip-link">
-            Pular para o conteúdo
-          </a>
+    <TemaProvider>
+      <AuthProvider>
+        <Router>
+          <div className="app">
+            <a href="#conteudo-principal" className="skip-link">
+              Pular para o conteúdo
+            </a>
 
-          <Navbar />
+            <Navbar />
 
-          <main id="conteudo-principal" className="app__main">
-            <Paginas />
-          </main>
+            <main id="conteudo-principal" className="app__main">
+              <Paginas />
+            </main>
 
-          <Footer />
+            <Footer />
 
-          <Toaster
-            position="bottom-center"
-            theme="system"
-            toastOptions={{ className: "toast" }}
-            offset={24}
-          />
-        </div>
-      </Router>
-    </AuthProvider>
+            <Avisos />
+          </div>
+        </Router>
+      </AuthProvider>
+    </TemaProvider>
   );
 }
 

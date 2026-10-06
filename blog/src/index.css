@@ -13,20 +13,20 @@
   /* Texto */
   --ink: #1a1714;
   --ink-2: #4a433c;
-  --muted: #7d746a;
+  --muted: #6b6258;
 
   /* Linhas */
   --line: #e2dacd;
   --line-strong: #cfc4b4;
 
   /* Acento */
-  --accent: #c2412d;
-  --accent-strong: #a3321f;
-  --accent-soft: rgba(194, 65, 45, 0.1);
+  --accent: #b53a26;
+  --accent-strong: #962f1d;
+  --accent-soft: rgba(181, 58, 38, 0.1);
   --on-accent: #fbf8f3;
 
   /* Categorias */
-  --instrumento: #c2412d;
+  --instrumento: #b53a26;
   --jogo: #2f4f8f;
 
   /* Tipografia */
@@ -56,33 +56,34 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #12100e;
-    --surface: #1b1815;
-    --surface-sunken: #0d0b0a;
+/* Tema escuro. O atributo data-theme é definido antes da página aparecer por um
+   script em public/index.html: segue a escolha salva do visitante ou, se ele
+   nunca escolheu, o tema do sistema. */
+:root[data-theme="dark"] {
+  --bg: #12100e;
+  --surface: #1b1815;
+  --surface-sunken: #0d0b0a;
 
-    --ink: #f2ece3;
-    --ink-2: #c7beb2;
-    --muted: #918779;
+  --ink: #f2ece3;
+  --ink-2: #c7beb2;
+  --muted: #918779;
 
-    --line: #2c2723;
-    --line-strong: #3d3631;
+  --line: #2c2723;
+  --line-strong: #3d3631;
 
-    --accent: #e8664c;
-    --accent-strong: #f08068;
-    --accent-soft: rgba(232, 102, 76, 0.14);
-    --on-accent: #1a1210;
+  --accent: #e8664c;
+  --accent-strong: #f08068;
+  --accent-soft: rgba(232, 102, 76, 0.14);
+  --on-accent: #1a1210;
 
-    --instrumento: #e8664c;
-    --jogo: #8aa6e6;
+  --instrumento: #e8664c;
+  --jogo: #8aa6e6;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.7);
-    --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.3), 0 28px 60px -24px rgba(0, 0, 0, 0.8);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.3), 0 28px 60px -24px rgba(0, 0, 0, 0.8);
 
-    color-scheme: dark;
-  }
+  color-scheme: dark;
 }
 
 /* --------------------------------------------------------------------------
