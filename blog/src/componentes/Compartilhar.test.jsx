@@ -4,7 +4,7 @@ import { BotaoCompartilhar, linksDeCompartilhamento } from "./Compartilhar";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const URL_PROJETO = "https://ensinemusica.netlify.app/projeto/123";
+const URL_PROJETO = "https://ensine-musica.vercel.app/projeto/123";
 
 describe("linksDeCompartilhamento", () => {
   test("monta a mensagem do WhatsApp com título e link", () => {

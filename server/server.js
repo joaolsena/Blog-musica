@@ -13,7 +13,7 @@ app.set("trust proxy", 1);
 
 // **Middleware**
 // CORS_ORIGIN (opcional): endereços do site separados por vírgula, ex.:
-// https://ensinemusica.netlify.app. Sem ela, qualquer origem é aceita — o que é
+// https://ensine-musica.vercel.app. Sem ela, qualquer origem é aceita — o que é
 // seguro aqui, porque as rotas de escrita exigem o token no cabeçalho.
 app.use(cors(process.env.CORS_ORIGIN ? { origin: process.env.CORS_ORIGIN.split(",").map((o) => o.trim()) } : undefined));
 app.use(express.json());

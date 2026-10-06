@@ -38,10 +38,43 @@ export function removerMidias(urls) {
     .catch((erroLimpeza) => console.error("Erro ao remover mídias enviadas:", erroLimpeza));
 }
 
-// Envia uma imagem ao servidor (que a reduz e guarda no Cloudinary) e devolve a URL
+// O servidor publicado (Vercel) recebe no máximo 4,5 MB por envio, e o Cloudinary
+// guarda as imagens com no máximo 2000 px. Por isso o navegador reduz as fotos
+// grandes antes de enviar: cabem no limite e sobem bem mais rápido no celular.
+const LADO_MAXIMO_PX = 2000;
+const TAMANHO_SEM_REDUZIR = 3.5 * 1024 * 1024;
+
+export async function prepararImagem(arquivo) {
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(arquivo); // já corrige a rotação das fotos de celular
+  } catch {
+    return arquivo; // navegador sem suporte: envia como está
+  }
+  const escala = Math.min(1, LADO_MAXIMO_PX / Math.max(bitmap.width, bitmap.height));
+  if (escala === 1 && arquivo.size <= TAMANHO_SEM_REDUZIR) {
+    bitmap.close();
+    return arquivo;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * escala);
+  canvas.height = Math.round(bitmap.height * escala);
+  const contexto = canvas.getContext("2d");
+  contexto.fillStyle = "#fff"; // PNG com transparência vira JPG com fundo branco
+  contexto.fillRect(0, 0, canvas.width, canvas.height);
+  contexto.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  const reduzida = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.88));
+  if (!reduzida) return arquivo;
+  return new File([reduzida], arquivo.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+}
+
+// Envia uma imagem ao servidor (que a guarda no Cloudinary) e devolve a URL
 async function enviarImagem(arquivo) {
   const formData = new FormData();
-  formData.append("imagem", arquivo);
+  formData.append("imagem", await prepararImagem(arquivo));
   const { data } = await axios.post("/upload", formData);
   return data.url;
 }

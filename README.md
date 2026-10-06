@@ -2,7 +2,7 @@
 
 Blog de educação musical com tutoriais de instrumentos e jogos musicais feitos com materiais alternativos, criados por estudantes para inspirar professores de música.
 
-Site: [ensinemusica.netlify.app](https://ensinemusica.netlify.app)
+Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 
 ## Funcionalidades
 
@@ -20,7 +20,7 @@ Site: [ensinemusica.netlify.app](https://ensinemusica.netlify.app)
 | Servidor (`server/`) | Node.js 22, Express, Mongoose, Multer |
 | Banco de dados | MongoDB Atlas |
 | Imagens e vídeos | Cloudinary |
-| Publicação | Netlify (site) e um serviço Node para o servidor (ex.: Render) |
+| Publicação | Vercel (site e servidor no mesmo endereço) |
 
 ## Estrutura
 
@@ -37,7 +37,8 @@ server/
   server.js            API (rotas em /api)
   server.test.js       testes da API
   .env.example         modelo das variáveis de ambiente
-netlify.toml           como o Netlify compila o site
+api/index.js           entrada do servidor no Vercel (usa server/server.js)
+vercel.json            como o Vercel compila o site e encaminha /api ao servidor
 ```
 
 ## Como rodar no computador
@@ -86,12 +87,12 @@ Outros comandos do site:
 
 Sem `ADMIN_PASSWORD` e `TOKEN_SECRET`, o site continua mostrando os projetos, mas ninguém consegue publicar, editar ou apagar.
 
-**Site** (painel do Netlify):
+**Site:**
 
 | Variável | Para que serve |
 | --- | --- |
-| `VITE_API_URL` | Endereço do servidor em produção, ex.: `https://ensine-musica-api.onrender.com` |
 | `VITE_SITE_URL` | Endereço do site, usado na prévia de links do WhatsApp. Já definido em `blog/.env.production` |
+| `VITE_API_URL` | Só se o servidor ficar em outro endereço. No Vercel, site e servidor ficam juntos e ela fica vazia |
 
 As variáveis `VITE_*` são embutidas no site durante a compilação: depois de mudar uma delas, publique o site de novo. Nunca coloque senhas nelas — elas ficam visíveis no código do site.
 
@@ -106,9 +107,13 @@ Os testes não acessam o banco de dados nem o Cloudinary.
 
 ## Publicação
 
-**Site (Netlify):** o `netlify.toml` já diz ao Netlify para compilar a pasta `blog` com o Vite. Basta definir `VITE_API_URL` no painel (Site configuration → Environment variables) e publicar.
+Site e servidor ficam no mesmo projeto do Vercel (`ensine-musica`). O `vercel.json` compila a pasta `blog` com o Vite e manda as rotas `/api/*` para o servidor, que roda como função em São Paulo (`gru1`), perto do banco.
 
-**Servidor:** em um serviço que rode Node.js (ex.: Render), use a pasta `server` como raiz, `npm install` como comando de instalação e `npm start` como comando de início, e cadastre as variáveis da tabela do servidor.
+1. Cadastre as variáveis da tabela do servidor no painel do Vercel (Settings → Environment Variables, ambiente Production).
+2. No MongoDB Atlas, em Network Access, libere o acesso de qualquer IP (`0.0.0.0/0`): o Vercel não tem IP fixo.
+3. Publique com `vercel deploy --prod` na raiz do repositório (ou conecte o repositório do GitHub ao projeto para publicar a cada push).
+
+No Vercel, cada envio ao servidor tem limite de 4,5 MB. Por isso o site reduz as fotos para 2000 px no navegador antes de enviar, e os vídeos vão direto ao Cloudinary.
 
 ## Rotas da API
 

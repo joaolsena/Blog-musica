@@ -1,0 +1,8 @@
+# Arquivos que não sobem no deploy pela linha de comando (vercel deploy)
+.env
+**/.env
+node_modules
+**/node_modules
+blog/dist
+.claude
+.DS_Store

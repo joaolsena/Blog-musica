@@ -1,7 +1,7 @@
 # Dependências (instaladas com npm install)
 node_modules/
 
-# Site compilado (gerado com npm run build; o Netlify gera o dele no deploy)
+# Site compilado (gerado com npm run build; o Vercel gera o dele no deploy)
 blog/dist/
 
 # Variáveis com senhas e chaves (veja server/.env.example)
@@ -10,3 +10,4 @@ blog/dist/
 # Arquivos do sistema e de log
 .DS_Store
 npm-debug.log*
+.vercel
