@@ -40,6 +40,31 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 
+// **Remoção de imagens do Cloudinary**
+// Extrai o public_id de uma URL do Cloudinary, ex.:
+// https://res.cloudinary.com/<cloud>/image/upload/v1712345/projetos/abc.jpg -> projetos/abc
+const extrairPublicId = (url) => {
+  if (typeof url !== "string") return null;
+  const match = url.match(/\/image\/upload\/(?:[^/]+\/)*?(?:v\d+\/)?(projetos\/[^.]+)\.\w+$/);
+  return match ? match[1] : null;
+};
+
+// Lista todas as URLs de imagem de um projeto
+const imagensDoProjeto = (projeto) =>
+  [projeto.imagem, ...(projeto.imagensPassoAPasso || [])].filter(Boolean);
+
+// Apaga as imagens no Cloudinary; falhas são registradas mas não interrompem a requisição
+const apagarImagens = async (urls) => {
+  const publicIds = [...new Set(urls.map(extrairPublicId).filter(Boolean))];
+  await Promise.all(
+    publicIds.map((publicId) =>
+      cloudinary.uploader
+        .destroy(publicId)
+        .catch((error) => console.error(`Erro ao apagar imagem ${publicId}:`, error))
+    )
+  );
+};
+
 // **Modelo do MongoDB**
 const Projeto = mongoose.model("Projeto", {
   titulo: String,
@@ -116,11 +141,17 @@ app.put("/projetos/:id", upload.single("imagem"), async (req, res) => {
       projetoData.imagem = req.file.path;  // URL da nova imagem
     }
 
-    const projetoAtualizado = await Projeto.findByIdAndUpdate(req.params.id, projetoData, { new: true });
+    const projetoAnterior = await Projeto.findById(req.params.id);
 
-    if (!projetoAtualizado) {
+    if (!projetoAnterior) {
       return res.status(404).send("Projeto não encontrado para editar");
     }
+
+    const projetoAtualizado = await Projeto.findByIdAndUpdate(req.params.id, projetoData, { new: true });
+
+    // Apagar do Cloudinary as imagens que deixaram de fazer parte do projeto
+    const imagensAtuais = new Set(imagensDoProjeto(projetoAtualizado));
+    await apagarImagens(imagensDoProjeto(projetoAnterior).filter((url) => !imagensAtuais.has(url)));
 
     res.status(200).json(projetoAtualizado);
   } catch (error) {
@@ -137,6 +168,8 @@ app.delete("/projetos/:id", async (req, res) => {
     if (!projetoRemovido) {
       return res.status(404).send("Projeto não encontrado para excluir");
     }
+
+    await apagarImagens(imagensDoProjeto(projetoRemovido));
 
     res.status(200).send("Projeto excluído com sucesso");
   } catch (error) {
@@ -183,6 +216,26 @@ app.post("/upload-multiplas", upload.array("imagensPassoAPasso", 4), async (req,
   } catch (error) {
     console.error("Erro ao fazer upload das imagens:", error);
     res.status(500).send("Erro ao fazer upload das imagens.");
+  }
+});
+
+// Rota para remover imagens enviadas cujo projeto não chegou a ser salvo
+app.post("/imagens/remover", async (req, res) => {
+  try {
+    const urls = Array.isArray(req.body.urls) ? req.body.urls.filter((url) => typeof url === "string") : [];
+
+    // Nunca apagar imagens que estejam em uso por algum projeto
+    const emUso = await Projeto.find(
+      { $or: [{ imagem: { $in: urls } }, { imagensPassoAPasso: { $in: urls } }] },
+      { imagem: 1, imagensPassoAPasso: 1 }
+    );
+    const urlsEmUso = new Set(emUso.flatMap(imagensDoProjeto));
+
+    await apagarImagens(urls.filter((url) => !urlsEmUso.has(url)));
+    res.status(200).send("Imagens removidas");
+  } catch (error) {
+    console.error("Erro ao remover imagens:", error);
+    res.status(500).send("Erro ao remover imagens");
   }
 });
 

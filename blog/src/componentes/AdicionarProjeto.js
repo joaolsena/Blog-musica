@@ -68,8 +68,14 @@ function AdicionarProjeto() {
       alert("Projeto adicionado com sucesso!");
     };
 
-    const finalizarComErro = (mensagem, error) => {
+    const finalizarComErro = (mensagem, error, urlsEnviadas = []) => {
       console.error(mensagem, error);
+      // Remove do Cloudinary as imagens já enviadas, já que o projeto não foi salvo
+      if (urlsEnviadas.length > 0) {
+        axios
+          .post("/imagens/remover", { urls: urlsEnviadas })
+          .catch((erroLimpeza) => console.error("Erro ao remover imagens enviadas:", erroLimpeza));
+      }
       setEnviando(false);
       alert("Não foi possível adicionar o projeto. Tente novamente.");
     };
@@ -112,10 +118,15 @@ function AdicionarProjeto() {
               axios
                 .post("/adicionar", projetoComImagens)
                 .then(() => finalizarComSucesso(projetoComImagens))
-                .catch((error) => finalizarComErro("Erro ao adicionar projeto:", error));
+                .catch((error) =>
+                  finalizarComErro("Erro ao adicionar projeto:", error, [
+                    imagemUrl,
+                    ...imagensPassoURLs,
+                  ])
+                );
             })
             .catch((error) =>
-              finalizarComErro("Erro ao fazer upload das imagens do passo a passo:", error)
+              finalizarComErro("Erro ao fazer upload das imagens do passo a passo:", error, [imagemUrl])
             );
         } else {
           // Caso não haja imagens do passo a passo
@@ -129,7 +140,7 @@ function AdicionarProjeto() {
           axios
             .post("/adicionar", projetoComImagens)
             .then(() => finalizarComSucesso(projetoComImagens))
-            .catch((error) => finalizarComErro("Erro ao adicionar projeto:", error));
+            .catch((error) => finalizarComErro("Erro ao adicionar projeto:", error, [imagemUrl]));
         }
       })
       .catch((error) => finalizarComErro("Erro ao fazer upload da imagem principal:", error));
