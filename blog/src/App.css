@@ -1131,6 +1131,13 @@
   letter-spacing: -0.02em;
 }
 
+.artigo__meta-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
 .artigo__meta {
   color: var(--muted);
 }
@@ -1514,6 +1521,282 @@
 .nao-encontrado__pauta {
   max-width: 420px;
   margin: 12px 0 20px;
+}
+
+/* Vídeos do projeto */
+.videos {
+  display: grid;
+  gap: 20px;
+}
+
+.video {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  background: #000;
+}
+
+.video video,
+.video iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.video__capa {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: #000;
+  cursor: pointer;
+}
+
+.video__capa img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.88;
+  transition: opacity 300ms ease, transform 700ms var(--ease-out);
+}
+
+/* Botão de play: círculo vermelhão que cresce levemente ao passar o mouse */
+.video__play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  margin: -34px 0 0 -34px;
+  padding-left: 3px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.5);
+  transition: transform 200ms var(--ease-out);
+}
+
+.video__capa:active .video__play {
+  transform: scale(0.94);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .video__capa:hover img {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+
+  .video__capa:hover .video__play {
+    transform: scale(1.08);
+  }
+}
+
+/* Compartilhar: botão e menu que cresce a partir dele */
+.compartilhar {
+  position: relative;
+  display: inline-flex;
+}
+
+.compartilhar__botao {
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 0.9375rem;
+}
+
+.compartilhar__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  width: 248px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  transform-origin: top left;
+  opacity: 0;
+  transform: scale(0.96) translateY(-4px);
+  visibility: hidden;
+  /* Saída mais rápida que a entrada */
+  transition:
+    opacity 120ms ease,
+    transform 120ms var(--ease-out),
+    visibility 0s linear 120ms;
+}
+
+.compartilhar__menu[data-aberto="true"] {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition:
+    opacity 180ms ease,
+    transform 180ms var(--ease-out),
+    visibility 0s;
+}
+
+.compartilhar[data-alinhar="fim"] .compartilhar__menu {
+  left: auto;
+  right: 0;
+  transform-origin: top right;
+}
+
+.compartilhar[data-abrir="cima"] .compartilhar__menu {
+  top: auto;
+  bottom: calc(100% + 8px);
+  transform-origin: bottom left;
+}
+
+.compartilhar[data-abrir="cima"][data-alinhar="fim"] .compartilhar__menu {
+  transform-origin: bottom right;
+}
+
+.compartilhar[data-abrir="cima"] .compartilhar__menu:not([data-aberto="true"]) {
+  transform: scale(0.96) translateY(4px);
+}
+
+.compartilhar__titulo {
+  padding: 8px 10px 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.compartilhar__menu ul {
+  padding: 0;
+  list-style: none;
+}
+
+.compartilhar__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-align: left;
+  color: var(--ink);
+  transition: background-color 150ms ease, transform 160ms var(--ease-out);
+}
+
+.compartilhar__item:active {
+  transform: scale(0.98);
+}
+
+.compartilhar__item:focus-visible {
+  outline-offset: -2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .compartilhar__item:hover {
+    background: var(--surface-sunken);
+  }
+}
+
+.compartilhar__icone {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--cor, var(--ink));
+  color: #fff;
+}
+
+.compartilhar__icone--copiar {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+/* Ícone de link vira um ✓ ao copiar (desfoque suaviza a troca) */
+.compartilhar__icone--copiar svg {
+  grid-area: 1 / 1;
+  transition:
+    opacity 200ms ease,
+    transform 300ms var(--ease-out),
+    filter 200ms ease;
+}
+
+.compartilhar__ok,
+.compartilhar__icone--copiar[data-copiado="true"] .compartilhar__copiar {
+  opacity: 0;
+  transform: scale(0.6);
+  filter: blur(2px);
+}
+
+.compartilhar__icone--copiar[data-copiado="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.compartilhar__icone--copiar[data-copiado="true"] .compartilhar__ok {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+/* Botão do WhatsApp (verde escuro o bastante para o texto branco ter bom contraste) */
+.btn--whatsapp {
+  background: #0e7a40;
+  color: #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn--whatsapp:hover {
+    background: #0b6635;
+  }
+}
+
+/* Convite para compartilhar, no fim do projeto */
+.convite {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: clamp(56px, 8vw, 88px);
+  padding: clamp(24px, 4vw, 36px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 140% at 100% 0%, var(--accent-soft), transparent 55%),
+    var(--surface);
+}
+
+.convite h2 {
+  margin-top: 8px;
+  font-size: clamp(1.75rem, 3.5vw, 2.25rem);
+  color: var(--ink);
+}
+
+.convite__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 479px) {
+  .convite__acoes .btn,
+  .convite__acoes .compartilhar {
+    flex: 1 1 100%;
+  }
+
+  .convite__acoes .compartilhar .btn {
+    width: 100%;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -1979,6 +2262,126 @@
   .imagens-atuais__remover:hover {
     background: var(--accent);
   }
+}
+
+/* Campo de vídeos (formulário) */
+.videos-lista {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.videos-lista__item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  animation: surgir 300ms var(--ease-out) both;
+}
+
+.videos-lista__capa {
+  position: relative;
+  flex-shrink: 0;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #000;
+}
+
+.videos-lista__capa img,
+.videos-lista__capa video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.videos-lista__play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.videos-lista__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.videos-lista__nome {
+  overflow: hidden;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.videos-lista__detalhe {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.videos-lista__remover {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  transition: background-color 150ms ease, color 150ms ease, transform 160ms var(--ease-out);
+}
+
+.videos-lista__remover:active {
+  transform: scale(0.92);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .videos-lista__remover:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+}
+
+.videos-opcoes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.videos-link {
+  display: flex;
+  gap: 8px;
+}
+
+.videos-link .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.videos-link .btn {
+  min-height: 50px;
+  border-radius: var(--radius-sm);
+}
+
+.videos-opcoes__ou {
+  align-self: center;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.dropzone--compacta {
+  padding: 18px 16px;
 }
 
 /* Página de formulário */

@@ -3,15 +3,16 @@ import axios from "axios";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Campo, EnvioImagens, TipoProjeto } from "./CamposFormulario";
+import CampoVideos, { urlsFinais } from "./CampoVideos";
 import {
   FORMATOS_ACEITOS,
   LIMITE_IMAGENS_PASSO,
   TAMANHO_MAXIMO_MB,
-  enviarImagens,
+  enviarMidias,
   mensagemDeErro,
-  removerImagens,
+  removerMidias,
   tamanhosValidos,
-} from "./envioImagens";
+} from "./envioMidias";
 
 const projetoVazio = {
   titulo: "",
@@ -34,6 +35,7 @@ function AdicionarProjeto() {
   const [novoProjeto, setNovoProjeto] = useState(projetoVazio);
   const [imagemPrincipal, setImagemPrincipal] = useState([]); // no máximo um arquivo
   const [imagensPasso, setImagensPasso] = useState([]); // arquivos do passo a passo
+  const [videos, setVideos] = useState([]); // links do YouTube e arquivos de vídeo (ver CampoVideos)
   const [enviando, setEnviando] = useState(false);
   const enviandoRef = useRef(false);
   const navigate = useNavigate();
@@ -55,22 +57,31 @@ function AdicionarProjeto() {
     const aviso = toast.loading("Enviando projeto…");
 
     try {
-      const imagens = await enviarImagens({ principal: imagemPrincipal[0], passos: imagensPasso });
-      enviadas = imagens.enviadas;
+      const midias = await enviarMidias(
+        {
+          principal: imagemPrincipal[0],
+          passos: imagensPasso,
+          videos: videos.filter((item) => item.tipo === "arquivo").map((item) => item.arquivo),
+        },
+        (mensagem) => toast.loading(mensagem, { id: aviso })
+      );
+      enviadas = midias.enviadas;
 
       // Enviar projeto ao backend
+      toast.loading("Publicando projeto…", { id: aviso });
       const { data: projetoSalvo } = await axios.post("/adicionar", {
         ...novoProjeto,
-        imagem: imagens.urlPrincipal || novoProjeto.imagem,
-        imagensPassoAPasso: imagens.urlsPassos,
+        imagem: midias.urlPrincipal || novoProjeto.imagem,
+        imagensPassoAPasso: midias.urlsPassos,
+        videos: urlsFinais(videos, midias.urlsVideos),
       });
 
       toast.success("Projeto publicado!", { id: aviso });
       navigate(projetoSalvo?._id ? `/projeto/${projetoSalvo._id}` : "/");
     } catch (error) {
       console.error("Erro ao adicionar projeto:", error);
-      // O projeto não foi salvo: remove do Cloudinary as imagens que já tinham subido
-      removerImagens(enviadas);
+      // O projeto não foi salvo: remove do Cloudinary as imagens e vídeos que já tinham subido
+      removerMidias(enviadas);
       toast.error(mensagemDeErro(error, "Não foi possível publicar o projeto. Tente novamente."), { id: aviso });
       enviandoRef.current = false;
       setEnviando(false);
@@ -175,6 +186,16 @@ function AdicionarProjeto() {
         <section className="form__section">
           <div className="form__section-head">
             <span className="form__num">III</span>
+            <h2>Vídeos</h2>
+          </div>
+          <div className="form__fields">
+            <CampoVideos itens={videos} onChange={setVideos} />
+          </div>
+        </section>
+
+        <section className="form__section">
+          <div className="form__section-head">
+            <span className="form__num">IV</span>
             <h2>Instruções de uso</h2>
           </div>
           <div className="form__fields">
@@ -191,7 +212,7 @@ function AdicionarProjeto() {
 
         <section className="form__section">
           <div className="form__section-head">
-            <span className="form__num">IV</span>
+            <span className="form__num">V</span>
             <h2>Aplicação didática</h2>
           </div>
           <div className="form__fields">
@@ -226,7 +247,7 @@ function AdicionarProjeto() {
 
         <section className="form__section">
           <div className="form__section-head">
-            <span className="form__num">V</span>
+            <span className="form__num">VI</span>
             <h2>Imagem e autoria</h2>
           </div>
           <div className="form__fields">

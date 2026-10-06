@@ -69,8 +69,8 @@ test("rotas de escrita recusam pedidos sem token", async () => {
     ["PUT", `/projetos/${id}`],
     ["DELETE", `/projetos/${id}`],
     ["POST", "/upload"],
-    ["POST", "/upload-multiplas"],
-    ["POST", "/imagens/remover"],
+    ["POST", "/videos/assinatura"],
+    ["POST", "/midias/remover"],
   ];
   for (const [method, caminho] of pedidos) {
     const resposta = await fetch(base + caminho, { method });
@@ -127,15 +127,60 @@ test("formato diferente de JPG ou PNG é recusado", async () => {
   assert.equal(resposta.status, 415);
 });
 
-test("mais de 4 imagens no passo a passo é recusado", async () => {
-  const cinco = Array.from({ length: 5 }, () => ({ tipo: "image/jpeg", bytes: 100 }));
-  const resposta = await fetch(`${base}/upload-multiplas`, {
+test("só uma imagem por envio", async () => {
+  const duas = [{ tipo: "image/jpeg", bytes: 100 }, { tipo: "image/jpeg", bytes: 100 }];
+  const resposta = await fetch(`${base}/upload`, {
     method: "POST",
     headers: comToken(),
-    body: formulario("imagensPassoAPasso", cinco),
+    body: formulario("imagem", duas),
   });
   assert.equal(resposta.status, 400);
-  assert.match(await resposta.text(), /no máximo 4/);
+});
+
+test("assinatura de vídeo vale só para a pasta e os formatos de vídeo", async () => {
+  const resposta = await fetch(`${base}/videos/assinatura`, { method: "POST", headers: comToken() });
+  assert.equal(resposta.status, 200);
+  const dados = await resposta.json();
+  assert.equal(dados.folder, "videos");
+  assert.match(dados.allowed_formats, /mp4/);
+  assert.ok(dados.signature && dados.timestamp && dados.api_key && dados.cloud_name);
+});
+
+// Salvar um projeto: a validação das mídias acontece antes de qualquer acesso ao banco
+const salvar = (corpo) =>
+  fetch(`${base}/adicionar`, {
+    method: "POST",
+    headers: { ...comToken(), "Content-Type": "application/json" },
+    body: JSON.stringify({ titulo: "Teste", ...corpo }),
+  });
+
+test("projeto com mais de 20 imagens no passo a passo é recusado", async () => {
+  const imagens = Array.from({ length: 21 }, (_, i) => `https://exemplo.com/${i}.jpg`);
+  const resposta = await salvar({ imagensPassoAPasso: imagens });
+  assert.equal(resposta.status, 400);
+  assert.match(await resposta.text(), /até 20 imagens/);
+});
+
+test("projeto com mais de 5 vídeos é recusado", async () => {
+  const videos = Array.from({ length: 6 }, () => "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  const resposta = await salvar({ videos });
+  assert.equal(resposta.status, 400);
+  assert.match(await resposta.text(), /até 5 vídeos/);
+});
+
+test("só aceita vídeos do YouTube ou do Cloudinary desta conta", async () => {
+  const recusados = [
+    "https://site-qualquer.com/video.mp4",
+    "javascript:alert(1)",
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ&autoplay=1",
+    "https://res.cloudinary.com/outra-conta/video/upload/v1/videos/x.mp4",
+    "https://res.cloudinary.com/teste/image/upload/v1/projetos/x.jpg",
+    "https://res.cloudinary.com/teste/video/upload/v1/outra-pasta/x.mp4",
+  ];
+  for (const video of recusados) {
+    const resposta = await salvar({ videos: [video] });
+    assert.equal(resposta.status, 400, video);
+  }
 });
 
 // Por último: depois dele o IP de teste fica bloqueado por 15 minutos

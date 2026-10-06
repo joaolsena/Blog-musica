@@ -7,7 +7,8 @@ Site: [ensinemusica.netlify.app](https://ensinemusica.netlify.app)
 ## Funcionalidades
 
 - Lista de projetos com busca e filtro por tipo (instrumento ou jogo)
-- Página de cada projeto: materiais, passo a passo com fotos, instruções de uso e aplicação didática
+- Página de cada projeto: materiais, passo a passo com até 20 fotos, vídeos (link do YouTube ou arquivo enviado), instruções de uso e aplicação didática
+- Botão de compartilhar: menu nativo do celular (WhatsApp, Instagram etc.) ou, no computador, WhatsApp, Telegram, Facebook, e-mail e "copiar link"
 - Área do professor, protegida por senha, para publicar, editar e apagar projetos e suas fotos
 - Modo claro e escuro, layout para computador e celular
 
@@ -18,7 +19,7 @@ Site: [ensinemusica.netlify.app](https://ensinemusica.netlify.app)
 | Site (`blog/`) | React 18, Vite 7, React Router, Axios, Sonner (avisos) |
 | Servidor (`server/`) | Node.js 22, Express, Mongoose, Multer |
 | Banco de dados | MongoDB Atlas |
-| Imagens | Cloudinary |
+| Imagens e vídeos | Cloudinary |
 | Publicação | Netlify (site) e um serviço Node para o servidor (ex.: Render) |
 
 ## Estrutura
@@ -77,7 +78,7 @@ Outros comandos do site:
 | Variável | Obrigatória | Para que serve |
 | --- | --- | --- |
 | `MONGO_URI` | sim | Conexão com o MongoDB Atlas |
-| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | sim | Envio e remoção de imagens |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | sim | Envio e remoção de imagens e vídeos |
 | `ADMIN_PASSWORD` | sim | Senha da área do professor |
 | `TOKEN_SECRET` | sim | Chave que assina os tokens de login |
 | `CORS_ORIGIN` | não | Restringe quais sites podem chamar a API |
@@ -118,12 +119,14 @@ Todas começam com `/api`. As marcadas com 🔒 exigem o token de login no cabe�
 | POST | `/auth/login` | Recebe `{ senha }` e devolve `{ token, expiraEm }` (válido por 7 dias) |
 | GET | `/projetos` | Lista os projetos |
 | GET | `/projetos/:id` | Um projeto |
-| POST | `/adicionar` 🔒 | Cria um projeto |
-| PUT | `/projetos/:id` 🔒 | Edita um projeto; imagens retiradas são apagadas do Cloudinary |
-| DELETE | `/projetos/:id` 🔒 | Apaga um projeto e suas imagens |
-| POST | `/upload` 🔒 | Envia a imagem principal (JPG/PNG, até 10 MB) |
-| POST | `/upload-multiplas` 🔒 | Envia até 4 imagens do passo a passo |
-| POST | `/imagens/remover` 🔒 | Apaga imagens enviadas que não ficaram em nenhum projeto |
+| POST | `/adicionar` 🔒 | Cria um projeto (até 20 imagens no passo a passo e 5 vídeos) |
+| PUT | `/projetos/:id` 🔒 | Edita um projeto; imagens e vídeos retirados são apagados do Cloudinary |
+| DELETE | `/projetos/:id` 🔒 | Apaga um projeto, suas imagens e seus vídeos |
+| POST | `/upload` 🔒 | Envia uma imagem (JPG/PNG, até 10 MB); uma por requisição |
+| POST | `/videos/assinatura` 🔒 | Autoriza o navegador a enviar um vídeo (até 100 MB) direto ao Cloudinary |
+| POST | `/midias/remover` 🔒 | Apaga imagens e vídeos enviados que não ficaram em nenhum projeto |
+
+Vídeos aceitos ao salvar: links do YouTube (`https://www.youtube.com/watch?v=...`) ou vídeos da pasta `videos/` desta conta do Cloudinary. Qualquer outro endereço é recusado.
 
 ## Créditos
 

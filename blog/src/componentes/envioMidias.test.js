@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { TAMANHO_MAXIMO_MB, mensagemDeErro, tamanhosValidos } from "./envioImagens";
+import { TAMANHO_MAXIMO_MB, mensagemDeErro, tamanhosValidos } from "./envioMidias";
 
 vi.mock("axios", () => ({ __esModule: true, default: { post: vi.fn() } }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));

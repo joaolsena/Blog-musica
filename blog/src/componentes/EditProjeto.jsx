@@ -7,11 +7,12 @@ import {
   FORMATOS_ACEITOS,
   LIMITE_IMAGENS_PASSO,
   TAMANHO_MAXIMO_MB,
-  enviarImagens,
+  enviarMidias,
   mensagemDeErro,
-  removerImagens,
+  removerMidias,
   tamanhosValidos,
-} from "./envioImagens";
+} from "./envioMidias";
+import CampoVideos, { urlsFinais, videosSalvos } from "./CampoVideos";
 
 // A rota já é protegida pelo PrivateRoute, então aqui o usuário está sempre autenticado
 function EditProjeto() {
@@ -41,6 +42,7 @@ function EditProjeto() {
   const [passosAtuais, setPassosAtuais] = useState([]);
   const [novaPrincipal, setNovaPrincipal] = useState([]); // no máximo um arquivo
   const [novosPassos, setNovosPassos] = useState([]);
+  const [videos, setVideos] = useState([]); // salvos, links novos e arquivos novos (ver CampoVideos)
   const vagasPasso = LIMITE_IMAGENS_PASSO - passosAtuais.length;
 
   // Busca os dados do projeto atual para pré-popular o formulário
@@ -51,6 +53,7 @@ function EditProjeto() {
         setProjeto((prev) => ({ ...prev, ...data }));
         setImagemAtual(data.imagem || "");
         setPassosAtuais(data.imagensPassoAPasso || []);
+        setVideos(videosSalvos(data.videos));
       } catch (error) {
         console.error("Erro ao carregar projeto:", error);
         toast.error("Não foi possível carregar o projeto.");
@@ -112,21 +115,30 @@ function EditProjeto() {
     const aviso = toast.loading("Salvando alterações…");
 
     try {
-      const imagens = await enviarImagens({ principal: novaPrincipal[0], passos: novosPassos });
-      enviadas = imagens.enviadas;
+      const midias = await enviarMidias(
+        {
+          principal: novaPrincipal[0],
+          passos: novosPassos,
+          videos: videos.filter((item) => item.tipo === "arquivo").map((item) => item.arquivo),
+        },
+        (mensagem) => toast.loading(mensagem, { id: aviso })
+      );
+      enviadas = midias.enviadas;
 
       // axios envia o token de acesso automaticamente (ver AuthContext)
+      toast.loading("Salvando alterações…", { id: aviso });
       await axios.put(`/projetos/${id}`, {
         ...projeto,
-        imagem: imagens.urlPrincipal || imagemAtual,
-        imagensPassoAPasso: [...passosAtuais, ...imagens.urlsPassos],
+        imagem: midias.urlPrincipal || imagemAtual,
+        imagensPassoAPasso: [...passosAtuais, ...midias.urlsPassos],
+        videos: urlsFinais(videos, midias.urlsVideos),
       });
       toast.success("Alterações salvas.", { id: aviso });
       navigate(`/projeto/${id}`);
     } catch (error) {
       console.error("Erro ao editar projeto:", error);
-      // As alterações não foram salvas: remove do Cloudinary as imagens novas que já tinham subido
-      removerImagens(enviadas);
+      // As alterações não foram salvas: remove do Cloudinary as mídias novas que já tinham subido
+      removerMidias(enviadas);
       toast.error(mensagemDeErro(error, "Não foi possível salvar as alterações. Tente novamente."), { id: aviso });
       salvandoRef.current = false;
       setSalvando(false);
@@ -262,7 +274,7 @@ function EditProjeto() {
         <section className="form__section">
           <div className="form__section-head">
             <span className="form__num">V</span>
-            <h2>Imagens</h2>
+            <h2>Imagens e vídeos</h2>
           </div>
           <div className="form__fields">
             <ImagensAtuais
@@ -294,6 +306,7 @@ function EditProjeto() {
                 O passo a passo já tem {LIMITE_IMAGENS_PASSO} imagens. Remova alguma para adicionar outra.
               </p>
             )}
+            <CampoVideos itens={videos} onChange={setVideos} />
           </div>
         </section>
 

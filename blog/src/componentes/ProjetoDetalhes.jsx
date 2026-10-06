@@ -7,12 +7,14 @@ import Lightbox from "./Lightbox";
 import NaoEncontrado from "./NaoEncontrado";
 import { rotuloTipo } from "./tipos";
 import { srcSetImagem, urlImagem } from "./imagens";
+import VideoProjeto from "./VideoProjeto";
+import { BotaoCompartilhar, ConviteCompartilhar } from "./Compartilhar";
 
 // Separa os campos de texto em que cada item é delimitado por ponto e vírgula
 const dividir = (texto) => (texto ? texto.split(";").map((item) => item.trim()).filter(Boolean) : []);
 
 // Numeração dos "movimentos" (seções), como numa obra musical
-const ROMANOS = ["I", "II", "III", "IV", "V", "VI"];
+const ROMANOS = ["I", "II", "III", "IV", "V", "VI", "VII"];
 
 // Marca no sumário a seção que está visível na tela
 function useSecaoAtiva(ids) {
@@ -97,6 +99,7 @@ function ProjetoDetalhes() {
     return [
       projeto.descricaoGeral && { id: "descricao", titulo: "Descrição" },
       temConstrucao && { id: "construcao", titulo: "Construção" },
+      projeto.videos?.length > 0 && { id: "videos", titulo: projeto.videos.length > 1 ? "Vídeos" : "Vídeo" },
       instrucaoUso && { id: "uso", titulo: projeto.tipoProjeto === "jogo" ? "Como jogar" : "Como tocar" },
       (projeto.sugestoesAtividades || projeto.habilidadesMusicais) && { id: "aplicacao", titulo: "Aplicação didática" },
       projeto.referencias && { id: "referencias", titulo: "Referências" },
@@ -184,15 +187,18 @@ function ProjetoDetalhes() {
           <span className={`tag tag--${projeto.tipoProjeto}`}>{rotuloTipo(projeto.tipoProjeto)}</span>
         )}
         <h1 className="artigo__title">{projeto.titulo}</h1>
-        <p className="artigo__meta">
-          Por <strong>{projeto.autor}</strong>
-          {projeto.data && (
-            <>
-              <span aria-hidden="true"> · </span>
-              {projeto.data}
-            </>
-          )}
-        </p>
+        <div className="artigo__meta-linha">
+          <p className="artigo__meta">
+            Por <strong>{projeto.autor}</strong>
+            {projeto.data && (
+              <>
+                <span aria-hidden="true"> · </span>
+                {projeto.data}
+              </>
+            )}
+          </p>
+          <BotaoCompartilhar titulo={projeto.titulo} />
+        </div>
       </header>
 
       {projeto.imagem && (
@@ -290,6 +296,24 @@ function ProjetoDetalhes() {
             </section>
           )}
 
+          {projeto.videos?.length > 0 && (
+            <section id="videos" className="secao">
+              <h2 className="secao__titulo">
+                <span className="secao__num">{numero("videos")}</span>
+                {projeto.videos.length > 1 ? "Vídeos" : "Vídeo"}
+              </h2>
+              <div className="videos">
+                {projeto.videos.map((url, index) => (
+                  <VideoProjeto
+                    key={url}
+                    url={url}
+                    titulo={projeto.videos.length > 1 ? `${projeto.titulo} — vídeo ${index + 1}` : projeto.titulo}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
           {instrucaoUso && (
             <section id="uso" className="secao">
               <h2 className="secao__titulo">
@@ -341,6 +365,8 @@ function ProjetoDetalhes() {
               </button>
             </div>
           )}
+
+          <ConviteCompartilhar titulo={projeto.titulo} />
 
           <div className="artigo__fim">
             <VoltarLink />

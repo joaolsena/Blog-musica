@@ -123,14 +123,25 @@ setInterval(() => {
 // **Conexão com o MongoDB**
 // (nos testes automáticos MONGO_URI fica vazia e o servidor não se conecta ao banco)
 const mongoURI = process.env.MONGO_URI;
-if (mongoURI) {
+const ESPERA_RECONEXAO_MS = 5000;
+
+// Se a primeira conexão falhar (rede instável, banco demorando a responder), o
+// Mongoose não tenta de novo sozinho: sem isto, o servidor ficaria no ar sem banco
+// até alguém reiniciá-lo. Depois de conectado, o próprio Mongoose cuida das reconexões.
+const conectarAoBanco = () =>
   mongoose
     .connect(mongoURI, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
       connectTimeoutMS: 10000,
     })
     .then(() => console.log("Conectado ao MongoDB"))
-    .catch((error) => console.error("Erro ao conectar ao MongoDB:", error));
+    .catch((error) => {
+      console.error(`Erro ao conectar ao MongoDB (nova tentativa em ${ESPERA_RECONEXAO_MS / 1000}s):`, error.message);
+      setTimeout(conectarAoBanco, ESPERA_RECONEXAO_MS);
+    });
+
+if (mongoURI) {
+  conectarAoBanco();
 } else {
   console.error("MONGO_URI não configurada: o servidor não vai se conectar ao banco.");
 }
@@ -142,14 +153,21 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// **Limites de mídia por projeto**
+// Também conferidos no site (src/componentes/envioImagens.js); os dois devem bater.
+const LIMITE_IMAGENS_PASSO = 20;
+const LIMITE_VIDEOS = 5;
+
 // **Recebimento de imagens**
-// O multer guarda o arquivo na memória; depois ele é enviado ao Cloudinary (ver subirParaCloudinary).
+// Cada imagem vem numa requisição própria (uma por vez), o que mantém baixo o uso
+// de memória do servidor. O multer guarda o arquivo na memória; depois ele é
+// enviado ao Cloudinary (ver subirParaCloudinary).
 const TAMANHO_MAXIMO_IMAGEM = 10 * 1024 * 1024; // 10 MB, o limite do plano gratuito do Cloudinary
 const FORMATOS_ACEITOS = ["image/jpeg", "image/png"];
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: TAMANHO_MAXIMO_IMAGEM, files: 5 },
+  limits: { fileSize: TAMANHO_MAXIMO_IMAGEM, files: 1 },
   fileFilter: (req, arquivo, cb) => {
     if (FORMATOS_ACEITOS.includes(arquivo.mimetype)) return cb(null, true);
     const erro = new Error("Formato de imagem não aceito. Use JPG ou PNG.");
@@ -158,27 +176,30 @@ const upload = multer({
   },
 });
 
-// **Remoção de imagens do Cloudinary**
-// Extrai o public_id de uma URL do Cloudinary, ex.:
-// https://res.cloudinary.com/<cloud>/image/upload/v1712345/projetos/abc.jpg -> projetos/abc
-const extrairPublicId = (url) => {
+// **Remoção de mídias do Cloudinary**
+// Extrai o tipo e o public_id de uma URL do Cloudinary, ex.:
+// .../image/upload/v1712345/projetos/abc.jpg -> { tipo: "image", publicId: "projetos/abc" }
+// .../video/upload/v1712345/videos/xyz.mp4   -> { tipo: "video", publicId: "videos/xyz" }
+// URLs de outros lugares (ex.: YouTube) devolvem null e nunca são apagadas.
+const extrairMidia = (url) => {
   if (typeof url !== "string") return null;
-  const match = url.match(/\/image\/upload\/(?:[^/]+\/)*?(?:v\d+\/)?(projetos\/[^.]+)\.\w+$/);
-  return match ? match[1] : null;
+  const match = url.match(/\/(image|video)\/upload\/(?:[^/]+\/)*?(?:v\d+\/)?((?:projetos|videos)\/[^.]+)\.\w+$/);
+  return match ? { tipo: match[1], publicId: match[2] } : null;
 };
 
-// Lista todas as URLs de imagem de um projeto
-const imagensDoProjeto = (projeto) =>
-  [projeto.imagem, ...(projeto.imagensPassoAPasso || [])].filter(Boolean);
+// Lista todas as URLs de mídia de um projeto (imagens e vídeos)
+const midiasDoProjeto = (projeto) =>
+  [projeto.imagem, ...(projeto.imagensPassoAPasso || []), ...(projeto.videos || [])].filter(Boolean);
 
-// Apaga as imagens no Cloudinary; falhas são registradas mas não interrompem a requisição
-const apagarImagens = async (urls) => {
-  const publicIds = [...new Set(urls.map(extrairPublicId).filter(Boolean))];
+// Apaga as mídias no Cloudinary; falhas são registradas mas não interrompem a requisição
+const apagarMidias = async (urls) => {
+  const midias = new Map();
+  urls.map(extrairMidia).filter(Boolean).forEach((midia) => midias.set(midia.publicId, midia));
   await Promise.all(
-    publicIds.map((publicId) =>
+    [...midias.values()].map(({ tipo, publicId }) =>
       cloudinary.uploader
-        .destroy(publicId)
-        .catch((error) => console.error(`Erro ao apagar imagem ${publicId}:`, error))
+        .destroy(publicId, { resource_type: tipo })
+        .catch((error) => console.error(`Erro ao apagar ${tipo} ${publicId}:`, error))
     )
   );
 };
@@ -199,23 +220,47 @@ const enviarParaCloudinary = (arquivo) =>
       .end(arquivo.buffer);
   });
 
-// Depois do multer: sobe os arquivos recebidos e coloca a URL em arquivo.path.
-// Se algum envio falhar, apaga os que já subiram, para não deixar imagens soltas.
+// Depois do multer: sobe o arquivo recebido e coloca a URL em arquivo.path
 const subirParaCloudinary = async (req, res, next) => {
-  const arquivos = [req.file, ...(req.files || [])].filter(Boolean);
-  const enviados = [];
   try {
-    await Promise.all(
-      arquivos.map(async (arquivo) => {
-        arquivo.path = await enviarParaCloudinary(arquivo);
-        enviados.push(arquivo.path);
-      })
-    );
+    if (req.file) req.file.path = await enviarParaCloudinary(req.file);
     next();
   } catch (erro) {
-    await apagarImagens(enviados);
     next(erro);
   }
+};
+
+// **Vídeos**
+// Vídeos são grandes demais para passar pelo servidor: o navegador envia direto ao
+// Cloudinary, com uma assinatura gerada aqui. A assinatura só vale para a pasta
+// "videos" e para formatos de vídeo, e só professores logados conseguem uma.
+const FORMATOS_VIDEO = "mp4,mov,m4v,webm,3gp";
+
+// Vídeos aceitos ao salvar um projeto: links do YouTube (no formato que o site gera)
+// ou vídeos enviados ao Cloudinary desta conta. Qualquer outro endereço é recusado,
+// para ninguém conseguir embutir um site qualquer na página do projeto.
+const videoPermitido = (url) =>
+  typeof url === "string" &&
+  (/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}$/.test(url) ||
+    (url.startsWith(`https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/`) &&
+      extrairMidia(url)?.publicId.startsWith("videos/")));
+
+// Confere as listas de mídia antes de salvar um projeto
+const validarMidias = (req, res, next) => {
+  const { imagensPassoAPasso = [], videos = [] } = req.body;
+  if (!Array.isArray(imagensPassoAPasso) || !Array.isArray(videos)) {
+    return res.status(400).send("Lista de imagens ou vídeos inválida.");
+  }
+  if (imagensPassoAPasso.length > LIMITE_IMAGENS_PASSO) {
+    return res.status(400).send(`Imagens demais. O passo a passo aceita até ${LIMITE_IMAGENS_PASSO} imagens.`);
+  }
+  if (videos.length > LIMITE_VIDEOS) {
+    return res.status(400).send(`Vídeos demais. Cada projeto aceita até ${LIMITE_VIDEOS} vídeos.`);
+  }
+  if (!videos.every(videoPermitido)) {
+    return res.status(400).send("Vídeo inválido. Use um link do YouTube ou envie o arquivo do vídeo.");
+  }
+  next();
 };
 
 // **Modelo do MongoDB**
@@ -231,6 +276,7 @@ const Projeto = mongoose.model("Projeto", {
   autor: String,
   imagem: String, // URL da imagem principal
   imagensPassoAPasso: [String], // URLs das imagens do passo a passo
+  videos: [String], // links do YouTube ou URLs de vídeos no Cloudinary
   referencias: String,
   tipoProjeto: { type: String, default: "instrumento" }, // "instrumento" ou "jogo"
   data: String,
@@ -262,21 +308,11 @@ api.get("/projetos/:id", async (req, res) => {
   }
 });
 
-// Rota para adicionar um novo projeto
-api.post("/adicionar", exigirAdmin, upload.single("imagem"), subirParaCloudinary, async (req, res) => {
+// Rota para adicionar um novo projeto (as mídias já chegam como URLs)
+api.post("/adicionar", exigirAdmin, validarMidias, async (req, res) => {
   try {
-    // Criar o objeto de projeto a partir do corpo da requisição
-    const projetoData = { ...req.body, data: req.body.data || dataDeHoje() };
-
-    // Verificar se a imagem foi enviada
-    if (req.file) {
-      projetoData.imagem = req.file.path;  // URL da imagem do Cloudinary
-    }
-
-    // Criar e salvar o novo projeto
-    const novoProjeto = new Projeto(projetoData);
+    const novoProjeto = new Projeto({ ...req.body, data: req.body.data || dataDeHoje() });
     await novoProjeto.save();
-
     res.status(201).json(novoProjeto);
   } catch (error) {
     console.error("Erro ao adicionar projeto:", error);
@@ -285,26 +321,19 @@ api.post("/adicionar", exigirAdmin, upload.single("imagem"), subirParaCloudinary
 });
 
 // Rota para editar um projeto existente
-api.put("/projetos/:id", exigirAdmin, upload.single("imagem"), subirParaCloudinary, async (req, res) => {
+api.put("/projetos/:id", exigirAdmin, validarMidias, async (req, res) => {
   try {
-    const projetoData = { ...req.body };
-
-    // Se uma nova imagem for enviada, atualizar a URL da imagem principal
-    if (req.file) {
-      projetoData.imagem = req.file.path;  // URL da nova imagem
-    }
-
     const projetoAnterior = await Projeto.findById(req.params.id);
 
     if (!projetoAnterior) {
       return res.status(404).send("Projeto não encontrado para editar");
     }
 
-    const projetoAtualizado = await Projeto.findByIdAndUpdate(req.params.id, projetoData, { new: true });
+    const projetoAtualizado = await Projeto.findByIdAndUpdate(req.params.id, req.body, { new: true });
 
-    // Apagar do Cloudinary as imagens que deixaram de fazer parte do projeto
-    const imagensAtuais = new Set(imagensDoProjeto(projetoAtualizado));
-    await apagarImagens(imagensDoProjeto(projetoAnterior).filter((url) => !imagensAtuais.has(url)));
+    // Apagar do Cloudinary as imagens e vídeos que deixaram de fazer parte do projeto
+    const midiasAtuais = new Set(midiasDoProjeto(projetoAtualizado));
+    await apagarMidias(midiasDoProjeto(projetoAnterior).filter((url) => !midiasAtuais.has(url)));
 
     res.status(200).json(projetoAtualizado);
   } catch (error) {
@@ -313,7 +342,7 @@ api.put("/projetos/:id", exigirAdmin, upload.single("imagem"), subirParaCloudina
   }
 });
 
-// Rota para excluir um projeto
+// Rota para excluir um projeto (e todas as suas imagens e vídeos)
 api.delete("/projetos/:id", exigirAdmin, async (req, res) => {
   try {
     const projetoRemovido = await Projeto.findByIdAndDelete(req.params.id);
@@ -322,7 +351,7 @@ api.delete("/projetos/:id", exigirAdmin, async (req, res) => {
       return res.status(404).send("Projeto não encontrado para excluir");
     }
 
-    await apagarImagens(imagensDoProjeto(projetoRemovido));
+    await apagarMidias(midiasDoProjeto(projetoRemovido));
 
     res.status(200).send("Projeto excluído com sucesso");
   } catch (error) {
@@ -331,67 +360,47 @@ api.delete("/projetos/:id", exigirAdmin, async (req, res) => {
   }
 });
 
-// Rota para upload de imagem principal
+// Rota para enviar uma imagem (principal ou do passo a passo), uma por requisição
 api.post("/upload", exigirAdmin, upload.single("imagem"), subirParaCloudinary, (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).send("Nenhuma imagem foi enviada.");
-    }
-    const imagemUrl = req.file.path; // URL do Cloudinary
-    res.status(200).json({ url: imagemUrl });
-  } catch (error) {
-    console.error("Erro ao fazer upload da imagem:", error);
-    res.status(500).send("Erro ao fazer upload da imagem");
+  if (!req.file) {
+    return res.status(400).send("Nenhuma imagem foi enviada.");
   }
+  res.status(200).json({ url: req.file.path }); // URL do Cloudinary
 });
 
-// Rota para upload de imagens múltiplas (passo a passo)
-api.post("/upload-multiplas", exigirAdmin, upload.array("imagensPassoAPasso", 4), subirParaCloudinary, async (req, res) => {
-  try {
-    // Verifique se os arquivos foram enviados
-    const imagens = req.files ? req.files.map((file) => file.path) : [];
-
-    if (imagens.length === 0) {
-      return res.status(400).send("Nenhuma imagem foi enviada.");
-    }
-
-    const projetoId = req.body.projetoId;
-    if (projetoId) {
-      const projeto = await Projeto.findById(projetoId);
-      if (!projeto) {
-        return res.status(404).send("Projeto não encontrado.");
-      }
-
-      projeto.imagensPassoAPasso.push(...imagens);
-      await projeto.save();
-      res.status(200).json({ urls: imagens, mensagem: "Imagens salvas no projeto com sucesso" });
-    } else {
-      // Se não houver `projetoId`, enviar as URLs como resposta
-      res.status(200).json({ urls: imagens });
-    }
-  } catch (error) {
-    console.error("Erro ao fazer upload das imagens:", error);
-    res.status(500).send("Erro ao fazer upload das imagens.");
-  }
+// Rota que autoriza o navegador a enviar um vídeo direto ao Cloudinary
+api.post("/videos/assinatura", exigirAdmin, (req, res) => {
+  const parametros = {
+    timestamp: Math.round(Date.now() / 1000),
+    folder: "videos",
+    allowed_formats: FORMATOS_VIDEO,
+  };
+  const assinatura = cloudinary.utils.api_sign_request(parametros, process.env.CLOUDINARY_API_SECRET);
+  res.json({
+    ...parametros,
+    signature: assinatura,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  });
 });
 
-// Rota para remover imagens enviadas cujo projeto não chegou a ser salvo
-api.post("/imagens/remover", exigirAdmin, async (req, res) => {
+// Rota para remover mídias enviadas cujo projeto não chegou a ser salvo
+api.post("/midias/remover", exigirAdmin, async (req, res) => {
   try {
     const urls = Array.isArray(req.body.urls) ? req.body.urls.filter((url) => typeof url === "string") : [];
 
-    // Nunca apagar imagens que estejam em uso por algum projeto
+    // Nunca apagar mídias que estejam em uso por algum projeto
     const emUso = await Projeto.find(
-      { $or: [{ imagem: { $in: urls } }, { imagensPassoAPasso: { $in: urls } }] },
-      { imagem: 1, imagensPassoAPasso: 1 }
+      { $or: [{ imagem: { $in: urls } }, { imagensPassoAPasso: { $in: urls } }, { videos: { $in: urls } }] },
+      { imagem: 1, imagensPassoAPasso: 1, videos: 1 }
     );
-    const urlsEmUso = new Set(emUso.flatMap(imagensDoProjeto));
+    const urlsEmUso = new Set(emUso.flatMap(midiasDoProjeto));
 
-    await apagarImagens(urls.filter((url) => !urlsEmUso.has(url)));
-    res.status(200).send("Imagens removidas");
+    await apagarMidias(urls.filter((url) => !urlsEmUso.has(url)));
+    res.status(200).send("Mídias removidas");
   } catch (error) {
-    console.error("Erro ao remover imagens:", error);
-    res.status(500).send("Erro ao remover imagens");
+    console.error("Erro ao remover mídias:", error);
+    res.status(500).send("Erro ao remover mídias");
   }
 });
 
@@ -403,8 +412,8 @@ app.use((erro, req, res, next) => {
   if (erro instanceof multer.MulterError) {
     const mensagens = {
       LIMIT_FILE_SIZE: "Imagem muito grande. O limite é 10 MB por imagem.",
-      LIMIT_FILE_COUNT: "Imagens demais. Envie no máximo 4 imagens do passo a passo.",
-      LIMIT_UNEXPECTED_FILE: "Imagens demais. Envie no máximo 4 imagens do passo a passo.",
+      LIMIT_FILE_COUNT: "Envie uma imagem por vez.",
+      LIMIT_UNEXPECTED_FILE: "Envie uma imagem por vez.",
     };
     const status = erro.code === "LIMIT_FILE_SIZE" ? 413 : 400;
     return res.status(status).send(mensagens[erro.code] || "Envio de imagem inválido.");
