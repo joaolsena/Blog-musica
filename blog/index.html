@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.svg" type="image/svg+xml" />
-    <link rel="alternate icon" href="%PUBLIC_URL%/novo-favicon.ico" type="image/x-icon" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="/novo-favicon.ico" type="image/x-icon" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#f5f1ea" />
     <meta name="color-scheme" content="light dark" />
     <script>
@@ -38,13 +38,13 @@
     <meta name="description" content="Explore recursos, projetos inovadores e ideias práticas para ensinar música. Descubra conteúdos exclusivos para educação musical e dicas para professores." />
 
     <!-- Prévia do link no WhatsApp, Facebook, Telegram etc. As redes exigem endereços
-         completos: REACT_APP_SITE_URL vem do arquivo .env.production. -->
+         completos: VITE_SITE_URL vem do arquivo .env.production. -->
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:site_name" content="Ensine Música" />
     <meta property="og:title" content="Ensine Música — Música se aprende fazendo" />
     <meta property="og:description" content="Tutoriais de instrumentos e jogos musicais feitos com materiais alternativos, criados por estudantes para inspirar professores de música." />
-    <meta property="og:image" content="%REACT_APP_SITE_URL%/og-image.png" />
+    <meta property="og:image" content="%VITE_SITE_URL%/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Ensine Música — Música se aprende fazendo" />
@@ -54,5 +54,6 @@
   <body>
     <noscript>Ative o JavaScript para usar o Ensine Música.</noscript>
     <div id="root"></div>
+    <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>

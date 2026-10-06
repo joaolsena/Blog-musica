@@ -4,15 +4,15 @@ import axios from "axios";
 import App from "./App";
 
 // Simula o servidor: nenhum teste faz requisições de verdade
-jest.mock("axios", () => {
-  const interceptor = { use: jest.fn(), eject: jest.fn() };
+vi.mock("axios", () => {
+  const interceptor = { use: vi.fn(), eject: vi.fn() };
   return {
     __esModule: true,
     default: {
-      get: jest.fn(),
-      post: jest.fn(),
-      put: jest.fn(),
-      delete: jest.fn(),
+      get: vi.fn(),
+      post: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
       defaults: {},
       interceptors: { request: interceptor, response: interceptor },
     },
@@ -31,14 +31,14 @@ function abrir(caminho) {
 }
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   localStorage.clear();
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => vi.restoreAllMocks());
 
 // Para testes que simulam falhas de propósito: o componente registra o erro no console
-const silenciarErrosEsperados = () => jest.spyOn(console, "error").mockImplementation(() => {});
+const silenciarErrosEsperados = () => vi.spyOn(console, "error").mockImplementation(() => {});
 
 describe("página inicial", () => {
   test("lista os projetos, com o mais recente em destaque", async () => {

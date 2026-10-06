@@ -1,12 +1,13 @@
-// Configuração dos testes (Jest + Testing Library).
+// Configuração dos testes (Vitest + Testing Library).
 // jest-dom adiciona verificações como expect(elemento).toBeInTheDocument().
-import "@testing-library/jest-dom";
-import { TextEncoder, TextDecoder } from "util";
+import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
 
-// O React Router 7 usa TextEncoder, que o ambiente de testes (jsdom) não tem
-Object.assign(global, { TextEncoder, TextDecoder });
+// Desmonta o que cada teste renderizou, para um teste não interferir no próximo
+afterEach(() => cleanup());
 
-// Funções do navegador que o jsdom não implementa
+// Funções do navegador que o jsdom (o navegador simulado dos testes) não implementa
 window.matchMedia =
   window.matchMedia ||
   ((query) => ({

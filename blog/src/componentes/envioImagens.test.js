@@ -1,8 +1,8 @@
 import { toast } from "sonner";
 import { TAMANHO_MAXIMO_MB, mensagemDeErro, tamanhosValidos } from "./envioImagens";
 
-jest.mock("axios", () => ({ __esModule: true, default: { post: jest.fn() } }));
-jest.mock("sonner", () => ({ toast: { error: jest.fn() } }));
+vi.mock("axios", () => ({ __esModule: true, default: { post: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 const arquivo = (nome, megabytes) => ({ name: nome, size: megabytes * 1024 * 1024 });
 

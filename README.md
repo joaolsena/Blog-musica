@@ -15,7 +15,7 @@ Site: [ensinemusica.netlify.app](https://ensinemusica.netlify.app)
 
 | Parte | Tecnologias |
 | --- | --- |
-| Site (`blog/`) | React 18, React Router, Axios, Sonner (avisos) |
+| Site (`blog/`) | React 18, Vite, React Router, Axios, Sonner (avisos) |
 | Servidor (`server/`) | Node.js 22, Express, Mongoose, Multer |
 | Banco de dados | MongoDB Atlas |
 | Imagens | Cloudinary |
@@ -24,11 +24,13 @@ Site: [ensinemusica.netlify.app](https://ensinemusica.netlify.app)
 ## Estrutura
 
 ```
-blog/                  site em React
-  public/              index.html, ícones e imagem de prévia de links
+blog/                  site em React (Vite)
+  index.html           página base, metadados e prévia de links
+  public/              ícones e imagem de prévia de links
   src/
     api.js             endereço do servidor
     componentes/       páginas e componentes
+  vite.config.js       porta, proxy para o servidor e testes
   .env.production      endereço público do site (prévia de links)
 server/
   server.js            API (rotas em /api)
@@ -55,10 +57,18 @@ npm start              # http://localhost:4000
 ```bash
 cd blog
 npm install
-npm start              # abre http://localhost:3000
+npm run dev            # http://localhost:3000
 ```
 
-No computador, o site repassa as chamadas de `/api` para o servidor na porta 4000 (campo `proxy` do `blog/package.json`), então não é preciso configurar o endereço do servidor.
+No computador, o site repassa as chamadas de `/api` para o servidor na porta 4000 (`proxy` em `blog/vite.config.js`), então não é preciso configurar o endereço do servidor.
+
+Outros comandos do site:
+
+| Comando | O que faz |
+| --- | --- |
+| `npm run build` | Compila o site para publicação (pasta `dist`) |
+| `npm run preview` | Abre o site compilado em http://localhost:3000, para conferir antes de publicar |
+| `npm run lint` | Verifica o código (variáveis sem uso, erros de JSX, uso dos hooks do React) |
 
 ## Variáveis de ambiente
 
@@ -79,10 +89,10 @@ Sem `ADMIN_PASSWORD` e `TOKEN_SECRET`, o site continua mostrando os projetos, ma
 
 | Variável | Para que serve |
 | --- | --- |
-| `REACT_APP_API_URL` | Endereço do servidor em produção, ex.: `https://ensine-musica-api.onrender.com` |
-| `REACT_APP_SITE_URL` | Endereço do site, usado na prévia de links do WhatsApp. Já definido em `blog/.env.production` |
+| `VITE_API_URL` | Endereço do servidor em produção, ex.: `https://ensine-musica-api.onrender.com` |
+| `VITE_SITE_URL` | Endereço do site, usado na prévia de links do WhatsApp. Já definido em `blog/.env.production` |
 
-As variáveis `REACT_APP_*` são embutidas no site durante a compilação: depois de mudar uma delas, publique o site de novo. Nunca coloque senhas nelas — elas ficam visíveis no código do site.
+As variáveis `VITE_*` são embutidas no site durante a compilação: depois de mudar uma delas, publique o site de novo. Nunca coloque senhas nelas — elas ficam visíveis no código do site.
 
 ## Testes
 
@@ -95,7 +105,7 @@ Os testes não acessam o banco de dados nem o Cloudinary.
 
 ## Publicação
 
-**Site (Netlify):** o `netlify.toml` já diz ao Netlify para compilar a pasta `blog`. Basta definir `REACT_APP_API_URL` no painel (Site configuration → Environment variables) e publicar.
+**Site (Netlify):** o `netlify.toml` já diz ao Netlify para compilar a pasta `blog` com o Vite. Basta definir `VITE_API_URL` no painel (Site configuration → Environment variables) e publicar.
 
 **Servidor:** em um serviço que rode Node.js (ex.: Render), use a pasta `server` como raiz, `npm install` como comando de instalação e `npm start` como comando de início, e cadastre as variáveis da tabela do servidor.
 

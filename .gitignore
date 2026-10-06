@@ -2,7 +2,7 @@
 node_modules/
 
 # Site compilado (gerado com npm run build; o Netlify gera o dele no deploy)
-blog/build/
+blog/dist/
 
 # Variáveis com senhas e chaves (veja server/.env.example)
 .env
