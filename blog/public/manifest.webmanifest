@@ -1,0 +1,67 @@
+{
+  "id": "/",
+  "name": "Ensine Música",
+  "short_name": "Ensine Música",
+  "description": "Instrumentos e jogos musicais feitos com materiais alternativos, com tutoriais completos para inspirar quem ensina música.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#12100e",
+  "theme_color": "#12100e",
+  "categories": ["education", "music"],
+  "icons": [
+    { "src": "/app/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/app/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/app/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Projetos",
+      "short_name": "Projetos",
+      "description": "Todos os instrumentos e jogos",
+      "url": "/",
+      "icons": [{ "src": "/app/atalho-projetos.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Sobre o Ensine Música",
+      "short_name": "Sobre",
+      "url": "/Ensine-Musica",
+      "icons": [{ "src": "/app/atalho-projetos.png", "sizes": "96x96", "type": "image/png" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/app/tela-inicio-larga.jpg",
+      "sizes": "1280x720",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Página inicial com os projetos"
+    },
+    {
+      "src": "/app/tela-projeto-larga.jpg",
+      "sizes": "1280x720",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Tutorial de um instrumento"
+    },
+    {
+      "src": "/app/tela-inicio-celular.jpg",
+      "sizes": "780x1688",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Página inicial no celular"
+    },
+    {
+      "src": "/app/tela-projeto-celular.jpg",
+      "sizes": "780x1688",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Tutorial de um instrumento no celular"
+    }
+  ]
+}

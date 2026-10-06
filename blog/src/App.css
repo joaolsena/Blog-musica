@@ -2573,3 +2573,265 @@
   font-family: var(--font-body) !important;
   border-radius: var(--radius-md) !important;
 }
+
+/* --------------------------------------------------------------------------
+   Instalar o app
+   -------------------------------------------------------------------------- */
+
+/* Botão discreto do cabeçalho (mesmo estilo do botão de tema) */
+.botao-instalar {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-2);
+  transition:
+    color 200ms ease,
+    background-color 200ms ease,
+    transform 160ms var(--ease-out);
+}
+
+.botao-instalar:active {
+  transform: scale(0.94);
+}
+
+/* Link do rodapé */
+.footer__instalar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink-2);
+  transition: color 200ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .botao-instalar:hover {
+    color: var(--ink);
+    background: var(--surface-sunken);
+  }
+
+  .footer__instalar:hover {
+    color: var(--accent);
+  }
+}
+
+/* Painel com o passo a passo. O <dialog> ocupa a tela toda e faz o papel do fundo
+   escurecido; o painel desliza de baixo no celular e aparece no centro no computador. */
+.instalar {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  background: rgba(10, 8, 6, 0.55);
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity 240ms ease;
+  overscroll-behavior: contain;
+}
+
+.instalar[open] {
+  display: grid;
+  place-items: center;
+}
+
+.instalar::backdrop {
+  background: transparent;
+}
+
+.instalar[data-estado="aberto"] {
+  opacity: 1;
+}
+
+.instalar[data-estado="saindo"] {
+  transition-duration: 200ms;
+}
+
+.instalar__painel {
+  position: relative;
+  width: min(420px, 100%);
+  max-height: calc(100svh - 32px);
+  overflow-y: auto;
+  padding: 28px 24px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(10px) scale(0.96);
+  transition: transform 280ms var(--ease-out);
+}
+
+.instalar[data-estado="aberto"] .instalar__painel {
+  transform: none;
+}
+
+.instalar[data-estado="saindo"] .instalar__painel {
+  transition-duration: 200ms;
+}
+
+.instalar__alca {
+  display: none;
+}
+
+.instalar__topo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.instalar__icone {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 15px;
+  box-shadow: 0 6px 18px -6px rgba(143, 42, 25, 0.6);
+}
+
+.instalar__titulo {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.instalar__subtitulo {
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.instalar__vantagens {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  font-size: 0.875rem;
+  color: var(--ink-2);
+}
+
+.instalar__vantagens li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.instalar__vantagens li::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.instalar__passos {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.instalar__passo {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.instalar__num {
+  min-width: 0.75em;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.instalar__passo-icone {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.instalar__passo-texto b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.instalar__ok {
+  width: 100%;
+  margin-top: 20px;
+}
+
+/* Celular: gaveta que sobe da borda de baixo */
+@media (max-width: 599px) {
+  .instalar {
+    padding: 0;
+  }
+
+  .instalar[open] {
+    place-items: end stretch;
+  }
+
+  .instalar__painel {
+    width: 100%;
+    max-height: calc(100svh - 48px);
+    padding: 12px max(20px, env(safe-area-inset-left)) calc(20px + env(safe-area-inset-bottom));
+    border-width: 1px 0 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    transform: translateY(100%);
+    transition: transform 420ms var(--ease-drawer);
+  }
+
+  .instalar[data-estado="saindo"] .instalar__painel {
+    transform: translateY(100%);
+    transition-duration: 220ms;
+  }
+
+  .instalar__alca {
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 0 auto 20px;
+    border-radius: 2px;
+    background: var(--line-strong);
+  }
+}
+
+@media (min-width: 600px) {
+  .instalar[data-estado="saindo"] .instalar__painel {
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .instalar__painel,
+  .instalar[data-estado="saindo"] .instalar__painel {
+    transform: none;
+    transition: none;
+  }
+}

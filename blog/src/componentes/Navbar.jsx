@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import Logo from "./Logo";
+import { BotaoInstalar } from "./InstalarApp";
 import { BotaoTema } from "./Tema";
 
 function Navbar() {
@@ -104,6 +105,7 @@ function Navbar() {
           </nav>
 
           <div className="header__end">
+            <BotaoInstalar />
             <BotaoTema />
             <button
               type="button"

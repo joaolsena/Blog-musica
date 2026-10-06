@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { BotaoInstalar } from "./InstalarApp";
 import Logo from "./Logo";
 
 function Footer() {
@@ -15,6 +16,7 @@ function Footer() {
           <nav className="footer__nav" aria-label="Rodapé">
             <Link to="/">Projetos</Link>
             <Link to="/Ensine-Musica">Sobre</Link>
+            <BotaoInstalar variante="link" />
           </nav>
         </div>
 

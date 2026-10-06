@@ -11,6 +11,7 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 - Botão de compartilhar: menu nativo do celular (WhatsApp, Instagram etc.) ou, no computador, WhatsApp, Telegram, Facebook, e-mail e "copiar link"
 - Área do professor, protegida por senha, para publicar, editar e apagar projetos e suas fotos
 - Modo claro e escuro, layout para computador e celular
+- Instalável como app (iPhone, iPad, Android, Mac e Windows): botão discreto no cabeçalho e no rodapé. No Chrome e no Edge abre a janela de instalação do sistema; no Safari e nos outros, mostra o passo a passo. Depois de instalado, abre sem internet o que já foi visto
 
 ## Tecnologias
 
@@ -27,7 +28,8 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 ```
 blog/                  site em React (Vite)
   index.html           página base, metadados e prévia de links
-  public/              ícones e imagem de prévia de links
+  public/              ícones, prévia de links, manifest.webmanifest e sw.js (app instalável)
+  public/app/          ícones do app e capturas de tela mostradas na instalação
   src/
     api.js             endereço do servidor
     componentes/       páginas e componentes
