@@ -1,138 +1,202 @@
-/* =========================================================
-   Ensine Música — fundações globais
-   Reset leve, variáveis de marca e tipografia base.
-   ========================================================= */
+/* ==========================================================================
+   Ensine Música — fundamentos
+   Paleta de "partitura": papel marfim, tinta quase preta e um único
+   acento vermelhão (a cor das anotações do regente na partitura).
+   ========================================================================== */
 
 :root {
-  /* Paleta — madeira de violão, latão e papel de partitura, sem roxo */
-  --color-paper: #f8f2e6;        /* fundo principal, tom de papel/partitura */
-  --color-paper-raised: #fffcf6; /* cartões e superfícies elevadas */
-  --color-ink: #2b2018;          /* texto principal, castanho quase preto */
-  --color-ink-soft: #55483a;     /* texto secundário */
-  --color-muted: #8c7c68;        /* texto auxiliar / legendas */
-  --color-line: #e6d8c0;         /* linhas e bordas sobre o papel */
+  /* Superfícies */
+  --bg: #f5f1ea;
+  --surface: #fbf9f5;
+  --surface-sunken: #ece6dc;
 
-  --color-night: #241a11;        /* cabeçalho, navegação, rodapé — madeira escura */
-  --color-night-soft: #372918;   /* hover sobre superfícies escuras */
-  --color-night-line: rgba(248, 242, 230, 0.14);
+  /* Texto */
+  --ink: #1a1714;
+  --ink-2: #4a433c;
+  --muted: #7d746a;
 
-  --color-gold: #b8863c;         /* latão — ação primária, links */
-  --color-gold-dark: #93692c;
-  --color-gold-tint: #f1e3c3;
+  /* Linhas */
+  --line: #e2dacd;
+  --line-strong: #cfc4b4;
 
-  --color-clay: #7c2d34;         /* selo "jogo", ações de exclusão — vinho */
-  --color-clay-dark: #5e1f26;
+  /* Acento */
+  --accent: #c2412d;
+  --accent-strong: #a3321f;
+  --accent-soft: rgba(194, 65, 45, 0.1);
+  --on-accent: #fbf8f3;
 
-  --color-violet: #3f5b46;       /* selo "instrumento" — verde floresta, forro de estojo */
-  --color-violet-dark: #2c4132;
+  /* Categorias */
+  --instrumento: #c2412d;
+  --jogo: #2f4f8f;
 
-  --color-accent: #e8532f;       /* coral vinil — o único ponto de cor vibrante do site */
-  --color-accent-dark: #c43f1f;
-  --color-accent-tint: #fbe3da;
+  /* Tipografia */
+  --font-display: "Instrument Serif", "Iowan Old Style", "Palatino Linotype", ui-serif, Georgia, serif;
+  --font-body: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-  --font-display: "Fraunces", "Iowan Old Style", ui-serif, serif;
-  --font-body: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Forma */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
 
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 22px;
+  --shadow-sm: 0 1px 2px rgba(26, 23, 20, 0.06);
+  --shadow-md: 0 1px 2px rgba(26, 23, 20, 0.04), 0 12px 32px -16px rgba(26, 23, 20, 0.22);
+  --shadow-lg: 0 2px 6px rgba(26, 23, 20, 0.05), 0 28px 60px -24px rgba(26, 23, 20, 0.35);
 
-  --shadow-card: 0 1px 2px rgba(36, 20, 51, 0.06), 0 10px 28px -14px rgba(36, 20, 51, 0.28);
-  --shadow-pop: 0 18px 40px -18px rgba(36, 20, 51, 0.4);
+  /* Movimento */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Layout */
+  --container: 1200px;
+  --gutter: clamp(16px, 4vw, 40px);
+  --header-h: 68px;
 
   color-scheme: light;
 }
 
-* {
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12100e;
+    --surface: #1b1815;
+    --surface-sunken: #0d0b0a;
+
+    --ink: #f2ece3;
+    --ink-2: #c7beb2;
+    --muted: #918779;
+
+    --line: #2c2723;
+    --line-strong: #3d3631;
+
+    --accent: #e8664c;
+    --accent-strong: #f08068;
+    --accent-soft: rgba(232, 102, 76, 0.14);
+    --on-accent: #1a1210;
+
+    --instrumento: #e8664c;
+    --jogo: #8aa6e6;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.7);
+    --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.3), 0 28px 60px -24px rgba(0, 0, 0, 0.8);
+
+    color-scheme: dark;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reset e base
+   -------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 html {
-  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Remove o "flash" cinza ao tocar em links e botões no celular */
+  -webkit-tap-highlight-color: transparent;
+  scroll-padding-top: calc(var(--header-h) + 24px);
 }
 
 body {
   margin: 0;
-  background-color: var(--color-paper);
-  color: var(--color-ink);
+  min-height: 100svh;
+  background: var(--bg);
+  color: var(--ink);
   font-family: var(--font-body);
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 1rem;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-  *, *::before, *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-  }
+img,
+svg {
+  display: block;
+  max-width: 100%;
 }
 
-h1, h2, h3, h4 {
+h1,
+h2,
+h3,
+h4,
+p,
+ul,
+ol,
+figure {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
   font-family: var(--font-display);
-  color: var(--color-ink);
-  font-weight: 600;
-  line-height: 1.2;
-  margin: 0 0 0.5em;
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 
 p {
-  margin: 0 0 1em;
+  text-wrap: pretty;
 }
 
 a {
   color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+a,
+label,
+[role="button"] {
+  /* Clique imediato no celular, sem o atraso de "duplo toque para zoom" */
+  touch-action: manipulation;
 }
 
 button {
-  font-family: inherit;
+  cursor: pointer;
+  /* Evita selecionar o texto do botão num toque longo */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-img {
-  max-width: 100%;
-  display: block;
+button:disabled {
+  cursor: not-allowed;
 }
 
-/* Foco visível e consistente em toda a aplicação */
-a:focus-visible,
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-[tabindex]:focus-visible {
-  outline: 3px solid var(--color-gold);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
+/* Campos com no mínimo 16px: abaixo disso o iOS dá zoom na página ao focar */
+input,
+textarea,
+select {
+  font-size: 16px;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
-/* Link de acesso rápido ao conteúdo, oculto até receber foco */
-.skip-link {
-  position: absolute;
-  left: 1rem;
-  top: -3rem;
-  background: var(--color-gold);
-  color: var(--color-night);
-  padding: 0.6rem 1rem;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-  text-decoration: none;
-  z-index: 1200;
-  transition: top 0.2s ease;
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
 
-.skip-link:focus {
-  top: 1rem;
-}
-
-/* Texto acessível para leitores de tela, oculto visualmente */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -145,14 +209,12 @@ code {
   border: 0;
 }
 
-/* Animação de entrada suave ao rolar a página */
-.reveal {
-  opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
-}
-
-.reveal.is-visible {
-  opacity: 1;
-  transform: translateY(0);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }

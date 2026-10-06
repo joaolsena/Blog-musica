@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "./AuthContext"; // Importa o AuthContext
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { toast } from "sonner";
+import { Campo, TipoProjeto } from "./CamposFormulario";
 
+// A rota já é protegida pelo PrivateRoute, então aqui o usuário está sempre autenticado
 function EditProjeto() {
   const { id } = useParams(); // Obtém o ID do projeto da URL
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth(); // Verifica se o usuário está autenticado
 
   const [projeto, setProjeto] = useState({
     titulo: "",
@@ -23,14 +24,6 @@ function EditProjeto() {
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
-  // Se não estiver autenticado, redireciona para a página de login
-  useEffect(() => {
-    if (!isAuthenticated) {
-      alert("Você precisa estar logado para acessar esta página!");
-      navigate("/login");
-    }
-  }, [isAuthenticated, navigate]);
-
   // Busca os dados do projeto atual para pré-popular o formulário
   useEffect(() => {
     const fetchProjeto = async () => {
@@ -40,6 +33,7 @@ function EditProjeto() {
         setProjeto((prev) => ({ ...prev, ...data }));
       } catch (error) {
         console.error("Erro ao carregar projeto:", error);
+        toast.error("Não foi possível carregar o projeto.");
       } finally {
         setCarregando(false);
       }
@@ -64,15 +58,12 @@ function EditProjeto() {
         body: JSON.stringify(projeto),
       });
 
-      if (response.ok) {
-        alert("Projeto atualizado com sucesso!");
-        navigate("/");
-      } else {
-        alert("Erro ao atualizar o projeto!");
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      toast.success("Alterações salvas.");
+      navigate(`/projeto/${id}`);
     } catch (error) {
       console.error("Erro ao editar projeto:", error);
-      alert("Erro ao atualizar o projeto!");
+      toast.error("Não foi possível salvar as alterações. Tente novamente.");
     } finally {
       setSalvando(false);
     }
@@ -80,176 +71,146 @@ function EditProjeto() {
 
   if (carregando) {
     return (
-      <div className="edit-container">
-        <p className="state-message">Carregando projeto...</p>
+      <div className="container form-page" role="status" aria-label="Carregando projeto">
+        <header className="form-page__head">
+          <span className="skeleton skeleton--line" style={{ width: 100 }} />
+          <span className="skeleton skeleton--hero-title" />
+        </header>
+        <div className="form">
+          <div className="form__section skeleton" style={{ height: 320 }} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="edit-container">
-      <h2>Editar projeto</h2>
-      <form onSubmit={handleSubmit}>
-        <fieldset className="form-fieldset">
-          <legend>Informações gerais</legend>
+    <div className="container form-page">
+      <header className="form-page__head">
+        <p className="eyebrow">Editar projeto</p>
+        <h1>{projeto.titulo || "Editar projeto"}</h1>
+      </header>
 
-          <div className="form-field">
-            <label htmlFor="edit-titulo">Título</label>
-            <input
-              id="edit-titulo"
-              type="text"
-              name="titulo"
-              value={projeto.titulo}
-              onChange={handleChange}
-              required
-            />
+      <form onSubmit={handleSubmit} className="form">
+        <section className="form__section">
+          <div className="form__section-head">
+            <span className="form__num">I</span>
+            <h2>Informações gerais</h2>
           </div>
-
-          <div className="form-field">
-            <label htmlFor="edit-descricaoGeral">Descrição geral</label>
-            <textarea
+          <div className="form__fields">
+            <Campo id="edit-titulo" name="titulo" rotulo="Título" value={projeto.titulo} onChange={handleChange} required />
+            <Campo
               id="edit-descricaoGeral"
               name="descricaoGeral"
+              rotulo="Descrição geral"
               value={projeto.descricaoGeral}
               onChange={handleChange}
-              rows="4"
+              multilinha
             />
+            <TipoProjeto valor={projeto.tipoProjeto} onChange={handleChange} />
           </div>
+        </section>
 
-          <div className="form-field">
-            <label>Tipo de projeto</label>
-            <div className="toggle-group">
-              <label className={projeto.tipoProjeto === "instrumento" ? "is-selected" : ""}>
-                <input
-                  type="radio"
-                  name="tipoProjeto"
-                  value="instrumento"
-                  checked={projeto.tipoProjeto === "instrumento"}
-                  onChange={handleChange}
-                />
-                Instrumento
-              </label>
-              <label className={projeto.tipoProjeto === "jogo" ? "is-selected" : ""}>
-                <input
-                  type="radio"
-                  name="tipoProjeto"
-                  value="jogo"
-                  checked={projeto.tipoProjeto === "jogo"}
-                  onChange={handleChange}
-                />
-                Jogo
-              </label>
-            </div>
+        <section className="form__section">
+          <div className="form__section-head">
+            <span className="form__num">II</span>
+            <h2>Construção</h2>
           </div>
-        </fieldset>
-
-        <fieldset className="form-fieldset">
-          <legend>Construção</legend>
-
-          <div className="form-field">
-            <label htmlFor="edit-materiais">Materiais</label>
-            <textarea
+          <div className="form__fields">
+            <Campo
               id="edit-materiais"
               name="materiais"
+              rotulo="Materiais"
+              dica="Separe cada material com ponto e vírgula (;)"
               value={projeto.materiais}
               onChange={handleChange}
-              rows="4"
+              multilinha
             />
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="edit-passoAPasso">Passo a passo</label>
-            <textarea
+            <Campo
               id="edit-passoAPasso"
               name="passoAPasso"
+              rotulo="Passo a passo"
+              dica="Separe cada etapa com ponto e vírgula (;)"
               value={projeto.passoAPasso}
               onChange={handleChange}
-              rows="4"
+              multilinha
             />
           </div>
-        </fieldset>
+        </section>
 
-        <fieldset className="form-fieldset">
-          <legend>Instruções de uso</legend>
-
-          <div className="form-field">
-            <label htmlFor="edit-comoTocar">Como tocar</label>
-            <textarea
+        <section className="form__section">
+          <div className="form__section-head">
+            <span className="form__num">III</span>
+            <h2>Instruções de uso</h2>
+          </div>
+          <div className="form__fields">
+            <Campo
               id="edit-comoTocar"
               name="comoTocar"
+              rotulo="Como tocar"
               value={projeto.comoTocar}
               onChange={handleChange}
-              rows="4"
+              multilinha
             />
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="edit-comoJogar">Como jogar</label>
-            <textarea
+            <Campo
               id="edit-comoJogar"
               name="comoJogar"
+              rotulo="Como jogar"
               value={projeto.comoJogar}
               onChange={handleChange}
-              rows="4"
+              multilinha
             />
           </div>
-        </fieldset>
+        </section>
 
-        <fieldset className="form-fieldset">
-          <legend>Aplicação didática</legend>
-
-          <div className="form-field">
-            <label htmlFor="edit-sugestoesAtividades">Sugestões de atividades</label>
-            <textarea
+        <section className="form__section">
+          <div className="form__section-head">
+            <span className="form__num">IV</span>
+            <h2>Aplicação didática</h2>
+          </div>
+          <div className="form__fields">
+            <Campo
               id="edit-sugestoesAtividades"
               name="sugestoesAtividades"
+              rotulo="Sugestões de atividades"
               value={projeto.sugestoesAtividades}
               onChange={handleChange}
-              rows="4"
+              multilinha
             />
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="edit-habilidadesMusicais">Habilidades musicais</label>
-            <textarea
+            <Campo
               id="edit-habilidadesMusicais"
               name="habilidadesMusicais"
+              rotulo="Habilidades musicais"
               value={projeto.habilidadesMusicais}
               onChange={handleChange}
-              rows="4"
+              multilinha
             />
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="edit-referencias">Referências</label>
-            <textarea
+            <Campo
               id="edit-referencias"
               name="referencias"
+              rotulo="Referências"
               value={projeto.referencias}
               onChange={handleChange}
-              rows="4"
+              multilinha
             />
           </div>
-        </fieldset>
+        </section>
 
-        <fieldset className="form-fieldset">
-          <legend>Autoria</legend>
-          <div className="form-field">
-            <label htmlFor="edit-autor">Autor</label>
-            <input
-              id="edit-autor"
-              type="text"
-              name="autor"
-              value={projeto.autor}
-              onChange={handleChange}
-              required
-            />
+        <section className="form__section">
+          <div className="form__section-head">
+            <span className="form__num">V</span>
+            <h2>Autoria</h2>
           </div>
-        </fieldset>
+          <div className="form__fields">
+            <Campo id="edit-autor" name="autor" rotulo="Autor" value={projeto.autor} onChange={handleChange} required />
+          </div>
+        </section>
 
-        <div className="form-card__submit">
-          <button type="submit" className="btn btn-primary save-button" disabled={salvando}>
-            {salvando ? "Salvando..." : "Salvar alterações"}
+        <div className="form__submit">
+          <Link to={`/projeto/${id}`} className="btn btn--ghost btn--lg">
+            Cancelar
+          </Link>
+          <button type="submit" className="btn btn--primary btn--lg" disabled={salvando}>
+            {salvando ? "Salvando…" : "Salvar alterações"}
           </button>
         </div>
       </form>

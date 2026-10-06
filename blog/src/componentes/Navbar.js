@@ -1,128 +1,168 @@
-import React, { useState } from "react";
-import { NavLink } from "react-router-dom";
-import { useAuth } from "./AuthContext"; // Importando o hook para obter o estado de autenticação
-
-// Marca decorativa inspirada na roseta (boca) do violão.
-// Gira como um vinil quando alguém clica — um pequeno easter egg.
-function RosetteMark({ girando }) {
-  const raios = Array.from({ length: 8 });
-  return (
-    <svg
-      className={`site-header__mark${girando ? " is-spinning" : ""}`}
-      width="30"
-      height="30"
-      viewBox="0 0 40 40"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <circle cx="20" cy="20" r="18" stroke="currentColor" strokeWidth="1.2" />
-      <circle cx="20" cy="20" r="12" stroke="currentColor" strokeWidth="1.2" />
-      <circle cx="20" cy="20" r="2.6" fill="currentColor" />
-      {raios.map((_, index) => (
-        <line
-          key={index}
-          x1="20"
-          y1="9.5"
-          x2="20"
-          y2="13.5"
-          stroke="currentColor"
-          strokeWidth="1.1"
-          transform={`rotate(${index * 45} 20 20)`}
-        />
-      ))}
-    </svg>
-  );
-}
+import React, { useEffect, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "./AuthContext";
+import Logo from "./Logo";
 
 function Navbar() {
-  const { isAuthenticated, logout } = useAuth(); // Pegando o estado de autenticação
+  const { isAuthenticated, logout } = useAuth();
   const [menuAberto, setMenuAberto] = useState(false);
-  const [girando, setGirando] = useState(false);
+  const [rolou, setRolou] = useState(false);
+  const location = useLocation();
 
-  const fecharMenu = () => setMenuAberto(false);
+  // Fecha o menu ao trocar de página
+  useEffect(() => {
+    setMenuAberto(false);
+  }, [location.pathname]);
 
-  const girarLogo = () => {
-    setGirando(true);
-    window.setTimeout(() => setGirando(false), 700);
-  };
+  // Cabeçalho ganha borda e fundo mais sólido depois que a página rola
+  useEffect(() => {
+    const aoRolar = () => setRolou(window.scrollY > 8);
+    aoRolar();
+    window.addEventListener("scroll", aoRolar, { passive: true });
+    return () => window.removeEventListener("scroll", aoRolar);
+  }, []);
 
-  const linkClasse = ({ isActive }) => (isActive ? "is-active" : undefined);
+  // Com o menu aberto no celular: trava a rolagem da página e fecha com Esc
+  useEffect(() => {
+    if (!menuAberto) return undefined;
+    const aoTeclar = (e) => e.key === "Escape" && setMenuAberto(false);
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", aoTeclar);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", aoTeclar);
+    };
+  }, [menuAberto]);
+
+  const links = [
+    { to: "/", rotulo: "Projetos", end: true },
+    { to: "/Ensine-Musica", rotulo: "Sobre" },
+  ];
 
   return (
-    <header className="site-header">
-      <div className="navbar__inner">
-        <NavLink
-          to="/"
-          className="site-header__brand"
-          onClick={() => {
-            fecharMenu();
-            girarLogo();
-          }}
-        >
-          <RosetteMark girando={girando} />
-          <span className="site-header__wordmark">Ensine Música</span>
-        </NavLink>
+    <>
+      <header
+        className={`header${rolou ? " is-scrolled" : ""}${menuAberto ? " is-menu-open" : ""}`}
+      >
+        <div className="header__inner">
+          <Link
+            to="/"
+            className="header__brand"
+            aria-label="Ensine Música — página inicial"
+          >
+            <Logo />
+          </Link>
 
-        <button
-          type="button"
-          className="navbar__toggle"
-          aria-label={menuAberto ? "Fechar menu" : "Abrir menu"}
-          aria-expanded={menuAberto}
-          onClick={() => setMenuAberto((aberto) => !aberto)}
-        >
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
+          <nav className="header__nav" aria-label="Navegação principal">
+            <ul className="nav-list">
+              {links.map((link) => (
+                <li key={link.to}>
+                  <NavLink to={link.to} end={link.end} className="nav-link">
+                    {link.rotulo}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
 
-        <nav aria-label="Navegação principal">
-          <ul className={`navbar__list${menuAberto ? " is-open" : ""}`}>
-            <li>
-              <NavLink to="/" className={linkClasse} onClick={fecharMenu} end>
-                Início
+            <div className="header__actions">
+              {isAuthenticated ? (
+                <>
+                  <Link
+                    to="/adicionar-projeto"
+                    className="btn btn--primary btn--sm"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M12 5v14M5 12h14"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    Novo projeto
+                  </Link>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={logout}
+                  >
+                    Sair
+                  </button>
+                </>
+              ) : (
+                <NavLink to="/login" className="nav-link nav-link--quiet">
+                  Entrar
+                </NavLink>
+              )}
+            </div>
+          </nav>
+
+          <button
+            type="button"
+            className="menu-toggle"
+            aria-label={menuAberto ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={menuAberto}
+            aria-controls="menu-mobile"
+            onClick={() => setMenuAberto((aberto) => !aberto)}
+          >
+            <span />
+            <span />
+          </button>
+        </div>
+      </header>
+
+      {/* Menu do celular. Fica fora do <header> porque o backdrop-filter do cabeçalho
+          faria o position: fixed se posicionar dentro dele, cortando o menu. */}
+      <div
+        id="menu-mobile"
+        className={`mobile-menu${menuAberto ? " is-open" : ""}`}
+        aria-hidden={!menuAberto}
+        inert={menuAberto ? undefined : ""}
+      >
+        <ul>
+          {links.map((link, index) => (
+            <li key={link.to} style={{ "--i": index }}>
+              <NavLink
+                to={link.to}
+                end={link.end}
+                className="mobile-menu__link"
+              >
+                {link.rotulo}
               </NavLink>
             </li>
-            <li>
-              <NavLink to="/Ensine-Musica" className={linkClasse} onClick={fecharMenu}>
-                Sobre o Ensine Música
-              </NavLink>
-            </li>
-
-            {/* Se o usuário estiver autenticado, mostra a opção de adicionar projeto */}
-            {isAuthenticated && (
-              <li>
-                <NavLink to="/adicionar-projeto" className="navbar__cta" onClick={fecharMenu}>
-                  Adicionar Projeto
+          ))}
+          {isAuthenticated ? (
+            <>
+              <li style={{ "--i": links.length }}>
+                <NavLink to="/adicionar-projeto" className="mobile-menu__link">
+                  Novo projeto
                 </NavLink>
               </li>
-            )}
-
-            {/* Se o usuário estiver autenticado, mostra a opção de logout */}
-            {isAuthenticated ? (
-              <li>
+              <li style={{ "--i": links.length + 1 }}>
                 <button
                   type="button"
-                  className="navbar__logout"
-                  onClick={() => {
-                    logout();
-                    fecharMenu();
-                  }}
+                  className="mobile-menu__link"
+                  onClick={logout}
                 >
                   Sair
                 </button>
               </li>
-            ) : (
-              <li>
-                <NavLink to="/login" className={linkClasse} onClick={fecharMenu}>
-                  Login
-                </NavLink>
-              </li>
-            )}
-          </ul>
-        </nav>
+            </>
+          ) : (
+            <li style={{ "--i": links.length }}>
+              <NavLink to="/login" className="mobile-menu__link">
+                Entrar
+              </NavLink>
+            </li>
+          )}
+        </ul>
       </div>
-    </header>
+    </>
   );
 }
 

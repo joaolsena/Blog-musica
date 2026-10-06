@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import Waveform from "./Waveform";
+import Pauta from "./Pauta";
 import RevealOnScroll from "./RevealOnScroll";
+import { rotuloTipo } from "./tipos";
 
 const FILTROS = [
   { valor: "todos", rotulo: "Todos" },
@@ -21,10 +22,155 @@ function parseDataBR(data) {
   return new Date(ano, mes - 1, dia);
 }
 
-function truncar(texto, tamanho) {
-  if (!texto) return "";
-  if (texto.length <= tamanho) return texto;
-  return `${texto.slice(0, tamanho).trim()}…`;
+// Controle segmentado: a pílula de fundo desliza até a opção ativa
+function FiltroSegmentado({ valor, onChange, contagem }) {
+  const containerRef = useRef(null);
+  const [indicador, setIndicador] = useState(null);
+  const [pronto, setPronto] = useState(false);
+
+  useLayoutEffect(() => {
+    const medir = () => {
+      const ativo = containerRef.current?.querySelector('[aria-pressed="true"]');
+      if (ativo) setIndicador({ x: ativo.offsetLeft, w: ativo.offsetWidth });
+    };
+    medir();
+    window.addEventListener("resize", medir);
+    return () => window.removeEventListener("resize", medir);
+  }, [valor, contagem]);
+
+  // Só liga a transição depois da primeira medida, para a pílula não "voar" do canto ao carregar
+  useEffect(() => {
+    if (indicador && !pronto) {
+      const id = requestAnimationFrame(() => setPronto(true));
+      return () => cancelAnimationFrame(id);
+    }
+    return undefined;
+  }, [indicador, pronto]);
+
+  return (
+    <div className="segmented" role="group" aria-label="Filtrar por tipo de projeto" ref={containerRef}>
+      {indicador && (
+        <span
+          className={`segmented__indicator${pronto ? " is-ready" : ""}`}
+          style={{ transform: `translateX(${indicador.x}px)`, width: indicador.w }}
+          aria-hidden="true"
+        />
+      )}
+      {FILTROS.map((item) => (
+        <button
+          key={item.valor}
+          type="button"
+          className="segmented__option"
+          onClick={() => onChange(item.valor)}
+          aria-pressed={valor === item.valor}
+        >
+          {item.rotulo}
+          {contagem && <span className="segmented__count">{contagem[item.valor]}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CapaProjeto({ projeto }) {
+  if (projeto.imagem) {
+    return <img src={projeto.imagem} alt="" loading="lazy" decoding="async" />;
+  }
+  // Sem imagem: uma capa tipográfica com a pauta
+  return (
+    <div className="capa-vazia" aria-hidden="true">
+      <Pauta />
+    </div>
+  );
+}
+
+function ProjetoCard({ projeto }) {
+  return (
+    <article className="card">
+      <Link to={`/projeto/${projeto.id}`} className="card__link">
+        <div className="card__media">
+          <CapaProjeto projeto={projeto} />
+        </div>
+        <div className="card__body">
+          {projeto.tipoProjeto && (
+            <span className={`tag tag--${projeto.tipoProjeto}`}>{rotuloTipo(projeto.tipoProjeto)}</span>
+          )}
+          <h3 className="card__title">
+            <span>{projeto.titulo}</span>
+          </h3>
+          {projeto.descricaoGeral && <p className="card__excerpt">{projeto.descricaoGeral}</p>}
+          <p className="card__meta">
+            {projeto.autor}
+            {projeto.data && <span aria-hidden="true"> · </span>}
+            {projeto.data}
+          </p>
+        </div>
+      </Link>
+    </article>
+  );
+}
+
+function Destaque({ projeto }) {
+  return (
+    <RevealOnScroll as="section" className="destaque" aria-label="Projeto mais recente">
+      <Link to={`/projeto/${projeto.id}`} className="destaque__link">
+        <div className="destaque__media">
+          <CapaProjeto projeto={projeto} />
+        </div>
+        <div className="destaque__body">
+          <p className="eyebrow">Mais recente</p>
+          {projeto.tipoProjeto && (
+            <span className={`tag tag--${projeto.tipoProjeto}`}>{rotuloTipo(projeto.tipoProjeto)}</span>
+          )}
+          <h2 className="destaque__title">{projeto.titulo}</h2>
+          {projeto.descricaoGeral && <p className="destaque__excerpt">{projeto.descricaoGeral}</p>}
+          <p className="card__meta">
+            {projeto.autor}
+            {projeto.data && <span aria-hidden="true"> · </span>}
+            {projeto.data}
+          </p>
+          <span className="destaque__cta">
+            Ver projeto
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        </div>
+      </Link>
+    </RevealOnScroll>
+  );
+}
+
+function Esqueleto() {
+  return (
+    <div className="grid" role="status" aria-label="Carregando projetos">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div className="card card--skeleton" key={index} aria-hidden="true">
+          <div className="card__media skeleton" />
+          <div className="card__body">
+            <span className="skeleton skeleton--line" style={{ width: "30%" }} />
+            <span className="skeleton skeleton--title" />
+            <span className="skeleton skeleton--line" />
+            <span className="skeleton skeleton--line" style={{ width: "70%" }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Estado vazio: uma pausa (o silêncio da música)
+function Silencio({ titulo, texto, acao }) {
+  return (
+    <div className="silencio">
+      <svg className="silencio__pausa" viewBox="0 0 40 80" aria-hidden="true">
+        <path d="M14 6l14 17c-6 4-8 9-3 17l8 10c-8-3-15 0-12 8 2 5 7 8 7 8-10-4-18-10-15-18 2-5 8-6 12-4L12 33c6-4 8-10 2-17z" />
+      </svg>
+      <h2>{titulo}</h2>
+      <p>{texto}</p>
+      {acao}
+    </div>
+  );
 }
 
 function Projetos() {
@@ -51,7 +197,7 @@ function Projetos() {
           if (dataA && dataB) return dataB - dataA;
           if (dataA) return -1;
           if (dataB) return 1;
-          return a.titulo.localeCompare(b.titulo);
+          return (a.titulo || "").localeCompare(b.titulo || "");
         });
 
         setProjetos(projetosComIdString);
@@ -63,6 +209,15 @@ function Projetos() {
       })
       .finally(() => setCarregando(false));
   }, []);
+
+  const contagem = useMemo(
+    () => ({
+      todos: projetos.length,
+      instrumento: projetos.filter((p) => p.tipoProjeto === "instrumento").length,
+      jogo: projetos.filter((p) => p.tipoProjeto === "jogo").length,
+    }),
+    [projetos]
+  );
 
   const projetosFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -78,164 +233,116 @@ function Projetos() {
 
   // O destaque só aparece na visão padrão (sem busca e sem filtro ativo),
   // para não duplicar o mesmo card quando a lista já está filtrada.
-  const mostrarDestaque = !busca && filtro === "todos" && projetosFiltrados.length > 0;
+  const mostrarDestaque = !busca && filtro === "todos" && projetosFiltrados.length > 1;
   const destaque = mostrarDestaque ? projetosFiltrados[0] : null;
   const restante = mostrarDestaque ? projetosFiltrados.slice(1) : projetosFiltrados;
+  const temProjetos = !carregando && !erro && projetos.length > 0;
 
   return (
-    <div className="container">
-      <div className="page-heading">
-        <h1>Projetos</h1>
-        <Waveform />
-        <p>Instrumentos e jogos musicais desenvolvidos pelos alunos, prontos para inspirar sua próxima aula.</p>
-      </div>
-
-      <div className="projetos-toolbar">
-        <div className="filtro-pills" role="group" aria-label="Filtrar por tipo de projeto">
-          {FILTROS.map((item) => (
-            <button
-              key={item.valor}
-              type="button"
-              className={`filtro-pill${filtro === item.valor ? " is-active" : ""}`}
-              data-tipo={item.valor}
-              onClick={() => setFiltro(item.valor)}
-              aria-pressed={filtro === item.valor}
-            >
-              {item.rotulo}
-            </button>
-          ))}
-        </div>
-
-        <div className="search-field">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          <label htmlFor="busca-projetos" className="sr-only">
-            Buscar projetos por título ou autor
-          </label>
-          <input
-            id="busca-projetos"
-            type="text"
-            placeholder="Buscar por título ou autor..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {!carregando && !erro && (
-        <p className="projetos-toolbar__count">
-          {projetosFiltrados.length} {projetosFiltrados.length === 1 ? "projeto encontrado" : "projetos encontrados"}
-        </p>
-      )}
-
-      {carregando && (
-        <div className="loader-vinil" role="status" aria-live="polite">
-          <div className="loader-vinil__equalizer">
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
+    <>
+      <section className="hero">
+        <div className="container">
+          <p className="eyebrow hero__eyebrow">Educação musical na prática</p>
+          <div className="hero__grid">
+            <h1 className="hero__title">
+              Música se aprende <em>fazendo</em>.
+            </h1>
+            <div>
+              <p className="hero__lead">
+                Instrumentos e jogos musicais construídos com materiais alternativos — tutoriais completos, criados
+                por estudantes, para inspirar a sua próxima aula.
+              </p>
+              <Pauta className="hero__pauta" />
+            </div>
           </div>
-          <p>Afinando os instrumentos...</p>
         </div>
-      )}
+      </section>
 
-      {!carregando && erro && <p className="state-message">{erro}</p>}
+      <section className="container projetos" aria-labelledby="titulo-projetos">
+        <div className="projetos__head">
+          <h2 id="titulo-projetos" className="section-title">
+            Projetos
+          </h2>
 
-      {!carregando && !erro && projetosFiltrados.length === 0 && (
-        <p className="state-message">
-          {busca || filtro !== "todos"
-            ? "Nenhum projeto encontrado por aqui. Que tal tentar outro termo ou categoria?"
-            : "Ainda não há projetos publicados. Volte em breve!"}
-        </p>
-      )}
+          {temProjetos && (
+            <div className="toolbar">
+              <FiltroSegmentado valor={filtro} onChange={setFiltro} contagem={contagem} />
 
-      {!carregando && !erro && destaque && (
-        <RevealOnScroll as="section" className="featured" aria-label="Projeto em destaque">
-          <Link to={`/projeto/${destaque.id}`} className="featured__card">
-            <div className="featured__media">
-              {destaque.imagem && (
-                <img src={destaque.imagem} alt={destaque.titulo} loading="lazy" />
-              )}
-              <span className="featured__ribbon">Em destaque</span>
-              <svg className="featured__vinil" viewBox="0 0 100 100" aria-hidden="true">
-                <circle cx="50" cy="50" r="48" fill="#161010" />
-                <circle cx="50" cy="50" r="38" fill="none" stroke="#332720" strokeWidth="1.4" />
-                <circle cx="50" cy="50" r="28" fill="none" stroke="#332720" strokeWidth="1.4" />
-                <circle cx="50" cy="50" r="18" fill="none" stroke="#332720" strokeWidth="1.4" />
-                <circle cx="50" cy="50" r="7" fill="var(--color-accent)" />
-              </svg>
+              <div className="search">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                  <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <label htmlFor="busca-projetos" className="sr-only">
+                  Buscar projetos por título ou autor
+                </label>
+                <input
+                  id="busca-projetos"
+                  type="search"
+                  placeholder="Buscar por título ou autor"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  enterKeyHint="search"
+                  autoComplete="off"
+                />
+              </div>
             </div>
-            <div className="featured__body">
-              {destaque.tipoProjeto && (
-                <span className={`badge badge--${destaque.tipoProjeto}`}>
-                  {destaque.tipoProjeto === "jogo" ? "Jogo" : "Instrumento"}
-                </span>
-              )}
-              <h2>{destaque.titulo}</h2>
-              {destaque.descricaoGeral && <p>{truncar(destaque.descricaoGeral, 160)}</p>}
-              <span className="featured__meta">
-                Por {destaque.autor} • {destaque.data}
-              </span>
-              <span className="featured__cta">Explorar projeto →</span>
-            </div>
-          </Link>
-        </RevealOnScroll>
-      )}
+          )}
+        </div>
 
-      {!carregando && !erro && restante.length > 0 && (
-        <>
-          {mostrarDestaque && <h2 className="secao-titulo">Mais projetos</h2>}
-          <div className="lista-projetos">
-            {restante.map((projeto, index) => (
-              <RevealOnScroll
-                as="article"
-                key={projeto.id}
-                delay={Math.min(index, 5) * 60}
-                className={`trabalho${projeto.tipoProjeto === "jogo" ? " trabalho--jogo" : ""}`}
+        {carregando && <Esqueleto />}
+
+        {!carregando && erro && (
+          <Silencio
+            titulo="Fora do tom"
+            texto={erro}
+            acao={
+              <button type="button" className="btn btn--ghost" onClick={() => window.location.reload()}>
+                Tentar de novo
+              </button>
+            }
+          />
+        )}
+
+        {!carregando && !erro && projetos.length === 0 && (
+          <Silencio
+            titulo="Silêncio por enquanto"
+            texto="Ainda não há projetos publicados. Os primeiros trabalhos aparecem aqui em breve."
+          />
+        )}
+
+        {temProjetos && projetosFiltrados.length === 0 && (
+          <Silencio
+            titulo="Nenhum projeto encontrado"
+            texto="Tente outro termo de busca ou outra categoria."
+            acao={
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => {
+                  setBusca("");
+                  setFiltro("todos");
+                }}
               >
-                {projeto.imagem && (
-                  <Link to={`/projeto/${projeto.id}`} className="trabalho__media">
-                    <img src={projeto.imagem} alt={projeto.titulo} loading="lazy" />
-                    <span className="trabalho__overlay" aria-hidden="true">
-                      <span className="play-badge">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </span>
-                      <span className="equalizer">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                      </span>
-                    </span>
-                  </Link>
-                )}
-                <div className="trabalho__body">
-                  {projeto.tipoProjeto && (
-                    <span className={`badge badge--${projeto.tipoProjeto}`}>
-                      {projeto.tipoProjeto === "jogo" ? "Jogo" : "Instrumento"}
-                    </span>
-                  )}
-                  <Link className="titulo-link" to={`/projeto/${projeto.id}`}>
-                    <h3>{projeto.titulo}</h3>
-                  </Link>
-                  {projeto.descricaoGeral && (
-                    <p className="trabalho__resumo">{truncar(projeto.descricaoGeral, 90)}</p>
-                  )}
-                  <span className="trabalho__meta">
-                    Por {projeto.autor} • {projeto.data}
-                  </span>
-                </div>
+                Limpar filtros
+              </button>
+            }
+          />
+        )}
+
+        {temProjetos && destaque && <Destaque projeto={destaque} />}
+
+        {temProjetos && restante.length > 0 && (
+          <div className="grid">
+            {restante.map((projeto, index) => (
+              <RevealOnScroll key={projeto.id} delay={(index % 3) * 60}>
+                <ProjetoCard projeto={projeto} />
               </RevealOnScroll>
             ))}
           </div>
-        </>
-      )}
-    </div>
+        )}
+      </section>
+    </>
   );
 }
 

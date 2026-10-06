@@ -3,23 +3,23 @@
   "name": "Ensine Música - Recursos e Projetos para Educação Musical",
   "icons": [
     {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     },
     {
-      "src": "logo192.png",
-      "type": "image/png",
-      "sizes": "192x192"
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
     },
     {
-      "src": "logo512.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#241a11",
-  "background_color": "#f8f2e6"
+  "theme_color": "#f5f1ea",
+  "background_color": "#f5f1ea"
 }
