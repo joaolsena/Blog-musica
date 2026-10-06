@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo } from "react";
+import { urlImagem } from "./imagens";
 
 // Campo de texto (linha única ou várias linhas) com rótulo e dica
 export function Campo({ id, rotulo, dica, multilinha = false, ...props }) {
@@ -101,6 +102,33 @@ export function EnvioImagens({ id, rotulo, dica, arquivos, multiplo = false, acc
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Imagens já salvas no projeto, cada uma com um botão para removê-la
+export function ImagensAtuais({ rotulo, urls, onRemover }) {
+  if (urls.length === 0) return null;
+  return (
+    <div className="field">
+      <span className="field__label">{rotulo}</span>
+      <ul className="imagens-atuais">
+        {urls.map((url, index) => (
+          <li key={url} className="imagens-atuais__item">
+            <img src={urlImagem(url, 300)} alt={`${rotulo} ${urls.length > 1 ? index + 1 : ""}`.trim()} />
+            <button
+              type="button"
+              className="imagens-atuais__remover"
+              onClick={() => onRemover(index)}
+              aria-label={`Remover ${rotulo.toLowerCase()}${urls.length > 1 ? ` ${index + 1}` : ""}`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+              </svg>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

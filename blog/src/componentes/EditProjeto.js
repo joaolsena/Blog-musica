@@ -1,8 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
-import { Campo, TipoProjeto } from "./CamposFormulario";
+import { Campo, EnvioImagens, ImagensAtuais, TipoProjeto } from "./CamposFormulario";
+import {
+  FORMATOS_ACEITOS,
+  LIMITE_IMAGENS_PASSO,
+  TAMANHO_MAXIMO_MB,
+  enviarImagens,
+  mensagemDeErro,
+  removerImagens,
+  tamanhosValidos,
+} from "./envioImagens";
 
 // A rota já é protegida pelo PrivateRoute, então aqui o usuário está sempre autenticado
 function EditProjeto() {
@@ -24,6 +33,15 @@ function EditProjeto() {
   });
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const salvandoRef = useRef(false);
+
+  // Imagens: as já salvas que continuam no projeto e os arquivos novos escolhidos agora.
+  // As que forem removidas aqui são apagadas do Cloudinary pelo servidor ao salvar.
+  const [imagemAtual, setImagemAtual] = useState("");
+  const [passosAtuais, setPassosAtuais] = useState([]);
+  const [novaPrincipal, setNovaPrincipal] = useState([]); // no máximo um arquivo
+  const [novosPassos, setNovosPassos] = useState([]);
+  const vagasPasso = LIMITE_IMAGENS_PASSO - passosAtuais.length;
 
   // Busca os dados do projeto atual para pré-popular o formulário
   useEffect(() => {
@@ -31,6 +49,8 @@ function EditProjeto() {
       try {
         const { data } = await axios.get(`/projetos/${id}`);
         setProjeto((prev) => ({ ...prev, ...data }));
+        setImagemAtual(data.imagem || "");
+        setPassosAtuais(data.imagensPassoAPasso || []);
       } catch (error) {
         console.error("Erro ao carregar projeto:", error);
         toast.error("Não foi possível carregar o projeto.");
@@ -46,18 +66,69 @@ function EditProjeto() {
     setProjeto((prevProjeto) => ({ ...prevProjeto, [name]: value }));
   };
 
+  const handleNovaPrincipal = (e) => {
+    const arquivos = e.target.files[0] ? [e.target.files[0]] : [];
+    if (!tamanhosValidos(arquivos)) {
+      e.target.value = "";
+      setNovaPrincipal([]);
+      return;
+    }
+    setNovaPrincipal(arquivos);
+  };
+
+  const handleNovosPassos = (e) => {
+    const arquivos = [...e.target.files];
+    if (arquivos.length > vagasPasso) {
+      toast.error(
+        vagasPasso === 0
+          ? `O passo a passo já tem ${LIMITE_IMAGENS_PASSO} imagens. Remova alguma para adicionar outra.`
+          : `Você pode adicionar mais ${vagasPasso} ${vagasPasso === 1 ? "imagem" : "imagens"} ao passo a passo.`
+      );
+      e.target.value = "";
+      setNovosPassos([]);
+      return;
+    }
+    if (!tamanhosValidos(arquivos)) {
+      e.target.value = "";
+      setNovosPassos([]);
+      return;
+    }
+    setNovosPassos(arquivos);
+  };
+
+  const removerPasso = (indice) => {
+    setPassosAtuais((atuais) => atuais.filter((_, i) => i !== indice));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Evita envios duplicados (clique duplo ou Enter repetido)
+    if (salvandoRef.current) return;
+    salvandoRef.current = true;
     setSalvando(true);
+
+    let enviadas = [];
+    const aviso = toast.loading("Salvando alterações…");
+
     try {
+      const imagens = await enviarImagens({ principal: novaPrincipal[0], passos: novosPassos });
+      enviadas = imagens.enviadas;
+
       // axios envia o token de acesso automaticamente (ver AuthContext)
-      await axios.put(`/projetos/${id}`, projeto);
-      toast.success("Alterações salvas.");
+      await axios.put(`/projetos/${id}`, {
+        ...projeto,
+        imagem: imagens.urlPrincipal || imagemAtual,
+        imagensPassoAPasso: [...passosAtuais, ...imagens.urlsPassos],
+      });
+      toast.success("Alterações salvas.", { id: aviso });
       navigate(`/projeto/${id}`);
     } catch (error) {
       console.error("Erro ao editar projeto:", error);
-      toast.error("Não foi possível salvar as alterações. Tente novamente.");
-    } finally {
+      // As alterações não foram salvas: remove do Cloudinary as imagens novas que já tinham subido
+      removerImagens(enviadas);
+      toast.error(mensagemDeErro(error, "Não foi possível salvar as alterações. Tente novamente."), { id: aviso });
+      salvandoRef.current = false;
       setSalvando(false);
     }
   };
@@ -191,6 +262,44 @@ function EditProjeto() {
         <section className="form__section">
           <div className="form__section-head">
             <span className="form__num">V</span>
+            <h2>Imagens</h2>
+          </div>
+          <div className="form__fields">
+            <ImagensAtuais
+              rotulo="Imagem principal"
+              urls={imagemAtual && novaPrincipal.length === 0 ? [imagemAtual] : []}
+              onRemover={() => setImagemAtual("")}
+            />
+            <EnvioImagens
+              id="edit-imagemPrincipal"
+              rotulo={imagemAtual ? "Trocar imagem principal" : "Imagem principal"}
+              dica={`JPG ou PNG com até ${TAMANHO_MAXIMO_MB} MB — aparece na capa do projeto`}
+              arquivos={novaPrincipal}
+              accept={FORMATOS_ACEITOS}
+              onChange={handleNovaPrincipal}
+            />
+            <ImagensAtuais rotulo="Imagens do passo a passo" urls={passosAtuais} onRemover={removerPasso} />
+            {vagasPasso > 0 ? (
+              <EnvioImagens
+                id="edit-imagensPasso"
+                rotulo="Adicionar imagens ao passo a passo"
+                dica={`Mais ${vagasPasso} ${vagasPasso === 1 ? "imagem" : "imagens"}, JPG ou PNG, com até ${TAMANHO_MAXIMO_MB} MB cada`}
+                arquivos={novosPassos}
+                accept={FORMATOS_ACEITOS}
+                multiplo
+                onChange={handleNovosPassos}
+              />
+            ) : (
+              <p className="field__hint">
+                O passo a passo já tem {LIMITE_IMAGENS_PASSO} imagens. Remova alguma para adicionar outra.
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="form__section">
+          <div className="form__section-head">
+            <span className="form__num">VI</span>
             <h2>Autoria</h2>
           </div>
           <div className="form__fields">

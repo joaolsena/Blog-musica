@@ -3,25 +3,15 @@ import axios from "axios";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Campo, EnvioImagens, TipoProjeto } from "./CamposFormulario";
-
-// Deve bater com o limite de upload.array() no servidor
-const LIMITE_IMAGENS_PASSO = 4;
-
-// Formatos aceitos pelo Cloudinary no servidor (allowed_formats)
-const FORMATOS_ACEITOS = "image/jpeg,image/png";
-
-// Deve bater com TAMANHO_MAXIMO_IMAGEM no servidor (limite do plano gratuito do Cloudinary)
-const TAMANHO_MAXIMO_MB = 10;
-
-// Avisa e retorna false se algum arquivo passar do tamanho máximo
-function tamanhosValidos(arquivos) {
-  const grande = arquivos.find((arquivo) => arquivo.size > TAMANHO_MAXIMO_MB * 1024 * 1024);
-  if (grande) {
-    toast.error(`"${grande.name}" tem ${(grande.size / 1024 / 1024).toFixed(1)} MB. O limite é ${TAMANHO_MAXIMO_MB} MB por imagem.`);
-    return false;
-  }
-  return true;
-}
+import {
+  FORMATOS_ACEITOS,
+  LIMITE_IMAGENS_PASSO,
+  TAMANHO_MAXIMO_MB,
+  enviarImagens,
+  mensagemDeErro,
+  removerImagens,
+  tamanhosValidos,
+} from "./envioImagens";
 
 const projetoVazio = {
   titulo: "",
@@ -61,56 +51,27 @@ function AdicionarProjeto() {
     enviandoRef.current = true;
     setEnviando(true);
 
-    const urlsEnviadas = [];
+    let enviadas = [];
     const aviso = toast.loading("Enviando projeto…");
 
     try {
-      // Enviar a imagem principal, se houver
-      let imagemUrl = novoProjeto.imagem;
-      if (imagemPrincipal.length > 0) {
-        const formDataImagem = new FormData();
-        formDataImagem.append("imagem", imagemPrincipal[0]);
-        const response = await axios.post("/upload", formDataImagem);
-        imagemUrl = response.data.url;
-        urlsEnviadas.push(imagemUrl);
-      }
-
-      // Enviar as imagens do passo a passo, se houver
-      let imagensPassoURLs = [];
-      if (imagensPasso.length > 0) {
-        const formDataPasso = new FormData();
-        imagensPasso.forEach((imagem) => {
-          formDataPasso.append("imagensPassoAPasso", imagem);
-        });
-        const responsePasso = await axios.post("/upload-multiplas", formDataPasso);
-        imagensPassoURLs = responsePasso.data.urls || [];
-        urlsEnviadas.push(...imagensPassoURLs);
-      }
+      const imagens = await enviarImagens({ principal: imagemPrincipal[0], passos: imagensPasso });
+      enviadas = imagens.enviadas;
 
       // Enviar projeto ao backend
       const { data: projetoSalvo } = await axios.post("/adicionar", {
         ...novoProjeto,
-        imagem: imagemUrl,
-        imagensPassoAPasso: imagensPassoURLs,
+        imagem: imagens.urlPrincipal || novoProjeto.imagem,
+        imagensPassoAPasso: imagens.urlsPassos,
       });
 
       toast.success("Projeto publicado!", { id: aviso });
       navigate(projetoSalvo?._id ? `/projeto/${projetoSalvo._id}` : "/");
     } catch (error) {
       console.error("Erro ao adicionar projeto:", error);
-      // Remove do Cloudinary as imagens já enviadas, já que o projeto não foi salvo
-      if (urlsEnviadas.length > 0) {
-        axios
-          .post("/imagens/remover", { urls: urlsEnviadas })
-          .catch((erroLimpeza) => console.error("Erro ao remover imagens enviadas:", erroLimpeza));
-      }
-      // Erros de imagem (tamanho, formato, quantidade) vêm do servidor com uma mensagem clara
-      const status = error.response?.status;
-      const mensagem =
-        [400, 413, 415].includes(status) && typeof error.response.data === "string"
-          ? error.response.data
-          : "Não foi possível publicar o projeto. Tente novamente.";
-      toast.error(mensagem, { id: aviso });
+      // O projeto não foi salvo: remove do Cloudinary as imagens que já tinham subido
+      removerImagens(enviadas);
+      toast.error(mensagemDeErro(error, "Não foi possível publicar o projeto. Tente novamente."), { id: aviso });
       enviandoRef.current = false;
       setEnviando(false);
     }

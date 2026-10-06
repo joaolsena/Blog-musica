@@ -4,6 +4,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { useAuth } from "./AuthContext"; // Importando o hook de autenticação
 import Lightbox from "./Lightbox";
+import NaoEncontrado from "./NaoEncontrado";
 import { rotuloTipo } from "./tipos";
 import { srcSetImagem, urlImagem } from "./imagens";
 
@@ -70,7 +71,8 @@ function ProjetoDetalhes() {
         setErro(null); // Limpa mensagens de erro, se houver
       })
       .catch((error) => {
-        setErro("Não foi possível carregar este projeto.");
+        // 404: o projeto não existe; outros erros: falha de conexão ou do servidor
+        setErro(error.response?.status === 404 ? "nao-encontrado" : "falha");
         console.error("Erro ao carregar projeto:", error);
       });
   }, [id]);
@@ -123,12 +125,26 @@ function ProjetoDetalhes() {
   };
 
   // Exibe uma mensagem de erro, se houver
+  if (erro === "nao-encontrado") {
+    return (
+      <NaoEncontrado
+        titulo="Projeto não encontrado"
+        texto="Este projeto não existe mais ou o link está incorreto."
+      />
+    );
+  }
+
   if (erro) {
     return (
       <div className="container artigo-estado">
-        <h1>Projeto não encontrado</h1>
-        <p>{erro}</p>
-        <VoltarLink />
+        <h1>Algo saiu do tom</h1>
+        <p>Não foi possível carregar este projeto agora. Verifique sua conexão e tente de novo.</p>
+        <div className="artigo-estado__acoes">
+          <button type="button" className="btn btn--primary" onClick={() => window.location.reload()}>
+            Tentar de novo
+          </button>
+          <VoltarLink />
+        </div>
       </div>
     );
   }

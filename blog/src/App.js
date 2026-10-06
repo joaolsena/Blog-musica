@@ -18,6 +18,7 @@ import LoginPage from "./componentes/Login"; // Tela de login
 import { AuthProvider } from "./componentes/AuthContext"; // Provedor do contexto de autenticação
 import PrivateRoute from "./componentes/PrivateRoute"; // Componente para proteger rotas privadas
 import { TemaProvider, useTema } from "./componentes/Tema"; // Tema claro/escuro
+import NaoEncontrado from "./componentes/NaoEncontrado"; // Página 404
 
 // Conteúdo das rotas. Fica separado do App porque precisa estar dentro do Router
 // para usar useLocation.
@@ -64,6 +65,9 @@ function Paginas() {
             </PrivateRoute>
           }
         />
+
+        {/* Qualquer outro endereço */}
+        <Route path="*" element={<NaoEncontrado />} />
       </Routes>
     </div>
   );

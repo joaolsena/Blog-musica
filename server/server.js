@@ -21,6 +21,17 @@ app.use(express.json());
 // Todas as rotas da API ficam em /api, separadas das páginas do site
 const api = express.Router();
 
+// Um :id que não é um ID válido do MongoDB não pode existir: responde 404 direto
+// (sem isso, o MongoDB lançaria um erro e a resposta seria um 500 genérico)
+api.param("id", (req, res, next, id) => {
+  if (/^[0-9a-f]{24}$/i.test(id)) return next();
+  res.status(404).send("Projeto não encontrado");
+});
+
+// Data de hoje no fuso do Amapá. O servidor costuma rodar em UTC, e sem o fuso
+// um projeto cadastrado depois das 21h sairia com a data do dia seguinte.
+const dataDeHoje = () => new Date().toLocaleDateString("pt-BR", { timeZone: "America/Belem" });
+
 // **Autenticação do professor**
 // A senha fica só no servidor (variável ADMIN_PASSWORD). Quem acerta a senha recebe um
 // token assinado com TOKEN_SECRET, que precisa ser enviado no cabeçalho Authorization
@@ -250,7 +261,7 @@ api.get("/projetos/:id", async (req, res) => {
 api.post("/adicionar", exigirAdmin, upload.single("imagem"), subirParaCloudinary, async (req, res) => {
   try {
     // Criar o objeto de projeto a partir do corpo da requisição
-    const projetoData = { ...req.body, data: req.body.data || new Date().toLocaleDateString("pt-BR") };
+    const projetoData = { ...req.body, data: req.body.data || dataDeHoje() };
 
     // Verificar se a imagem foi enviada
     if (req.file) {
