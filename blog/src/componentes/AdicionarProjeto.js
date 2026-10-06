@@ -1,149 +1,111 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import axios from "axios";
 
+// Deve bater com o limite de upload.array() no servidor
+const LIMITE_IMAGENS_PASSO = 4;
+
+// Formatos aceitos pelo Cloudinary no servidor (allowed_formats)
+const FORMATOS_ACEITOS = "image/jpeg,image/png";
+
+const projetoVazio = {
+  titulo: "",
+  nomeMaterial: "",
+  descricaoGeral: "",
+  materiais: "",
+  passoAPasso: "",
+  comoTocar: "",
+  comoJogar: "",
+  sugestoesAtividades: "",
+  habilidadesMusicais: "",
+  autor: "",
+  imagem: "",
+  tipoProjeto: "instrumento",
+  referencias: "",
+  imagensPassoAPasso: [], // URLs das imagens do passo a passo
+};
+
 function AdicionarProjeto() {
-  const [novoProjeto, setNovoProjeto] = useState({
-    titulo: "",
-    nomeMaterial: "",
-    descricaoGeral: "",
-    materiais: "",
-    passoAPasso: "",
-    comoTocar: "",
-    comoJogar: "",
-    sugestoesAtividades: "",
-    habilidadesMusicais: "",
-    autor: "",
-    imagem: "",
-    tipoProjeto: "instrumento",
-    referencias: "",
-    imagensPassoAPasso: [], // URLs das imagens do passo a passo
-  });
+  const [novoProjeto, setNovoProjeto] = useState(projetoVazio);
 
   const [imagemPreview, setImagemPreview] = useState(null);
   const [imagensPassoPreview, setImagensPassoPreview] = useState([]); // Pré-visualização das imagens do passo a passo
   const [projetos, setProjetos] = useState([]);
   const [enviando, setEnviando] = useState(false);
+  const enviandoRef = useRef(false);
 
-  const handleAdicionarProjeto = (e) => {
+  const handleAdicionarProjeto = async (e) => {
     e.preventDefault();
-    console.log("Enviando o formulário...");
+
+    // Evita envios duplicados (clique duplo ou Enter repetido antes do botão ser desabilitado)
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
     setEnviando(true);
 
-    const formDataImagem = new FormData();
-    const formDataPasso = new FormData();
+    const urlsEnviadas = [];
 
-    // Enviar imagem principal
-    if (imagemPreview) {
-      formDataImagem.append("imagem", imagemPreview);
-    }
+    try {
+      // Enviar a imagem principal, se houver
+      let imagemUrl = novoProjeto.imagem;
+      if (imagemPreview) {
+        const formDataImagem = new FormData();
+        formDataImagem.append("imagem", imagemPreview);
+        const response = await axios.post("/upload", formDataImagem);
+        imagemUrl = response.data.url;
+        urlsEnviadas.push(imagemUrl);
+      }
 
-    // Enviar imagens do passo a passo
-    if (imagensPassoPreview.length > 0) {
-      imagensPassoPreview.forEach((imagem) => {
-        formDataPasso.append("imagensPassoAPasso", imagem);
-      });
-    }
+      // Enviar as imagens do passo a passo, se houver
+      let imagensPassoURLs = [];
+      if (imagensPassoPreview.length > 0) {
+        const formDataPasso = new FormData();
+        imagensPassoPreview.forEach((imagem) => {
+          formDataPasso.append("imagensPassoAPasso", imagem);
+        });
+        const responsePasso = await axios.post("/upload-multiplas", formDataPasso);
+        imagensPassoURLs = responsePasso.data.urls || [];
+        urlsEnviadas.push(...imagensPassoURLs);
+      }
 
-    const finalizarComSucesso = (projetoComImagens) => {
+      const projetoComImagens = {
+        ...novoProjeto,
+        imagem: imagemUrl,
+        imagensPassoAPasso: imagensPassoURLs,
+      };
+
+      // Enviar projeto ao backend
+      await axios.post("/adicionar", projetoComImagens);
+
       setProjetos([...projetos, projetoComImagens]);
-      setNovoProjeto({
-        titulo: "",
-        nomeMaterial: "",
-        descricaoGeral: "",
-        materiais: "",
-        passoAPasso: "",
-        comoTocar: "",
-        comoJogar: "",
-        sugestoesAtividades: "",
-        habilidadesMusicais: "",
-        autor: "",
-        imagem: "",
-        tipoProjeto: "instrumento",
-        referencias: "",
-        imagensPassoAPasso: [],
-      });
+      setNovoProjeto(projetoVazio);
       setImagemPreview(null);
       setImagensPassoPreview([]);
-      setEnviando(false);
+      // Limpa os campos de arquivo (não são controlados pelo estado)
+      e.target.querySelectorAll('input[type="file"]').forEach((input) => (input.value = ""));
       alert("Projeto adicionado com sucesso!");
-    };
-
-    const finalizarComErro = (mensagem, error, urlsEnviadas = []) => {
-      console.error(mensagem, error);
+    } catch (error) {
+      console.error("Erro ao adicionar projeto:", error);
       // Remove do Cloudinary as imagens já enviadas, já que o projeto não foi salvo
       if (urlsEnviadas.length > 0) {
         axios
           .post("/imagens/remover", { urls: urlsEnviadas })
           .catch((erroLimpeza) => console.error("Erro ao remover imagens enviadas:", erroLimpeza));
       }
-      setEnviando(false);
       alert("Não foi possível adicionar o projeto. Tente novamente.");
-    };
+    } finally {
+      enviandoRef.current = false;
+      setEnviando(false);
+    }
+  };
 
-    // Enviar a imagem principal
-    axios
-      .post("/upload", formDataImagem, {
-        onUploadProgress: (progressEvent) => {
-          let percent = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          console.log(`Upload da Imagem Principal: ${percent}%`);
-        },
-      })
-      .then((response) => {
-        const imagemUrl = response.data.url; // URL da imagem principal
-
-        // Se houver imagens do passo a passo, enviar depois
-        if (imagensPassoPreview.length > 0) {
-          axios
-            .post("/upload-multiplas", formDataPasso, {
-              onUploadProgress: (progressEvent) => {
-                let percent = Math.round(
-                  (progressEvent.loaded * 100) / progressEvent.total
-                );
-                console.log(`Upload Passo a Passo Progress: ${percent}%`);
-              },
-            })
-            .then((responsePasso) => {
-              const imagensPassoURLs = responsePasso.data.urls || [];
-
-              // Adicionar URLs das imagens ao projeto
-              const projetoComImagens = {
-                ...novoProjeto,
-                imagem: imagemUrl || novoProjeto.imagem,
-                imagensPassoAPasso: imagensPassoURLs,
-              };
-
-              // Enviar projeto ao backend
-              axios
-                .post("/adicionar", projetoComImagens)
-                .then(() => finalizarComSucesso(projetoComImagens))
-                .catch((error) =>
-                  finalizarComErro("Erro ao adicionar projeto:", error, [
-                    imagemUrl,
-                    ...imagensPassoURLs,
-                  ])
-                );
-            })
-            .catch((error) =>
-              finalizarComErro("Erro ao fazer upload das imagens do passo a passo:", error, [imagemUrl])
-            );
-        } else {
-          // Caso não haja imagens do passo a passo
-          const projetoComImagens = {
-            ...novoProjeto,
-            imagem: imagemUrl || novoProjeto.imagem,
-            imagensPassoAPasso: [], // Caso não haja imagens do passo a passo
-          };
-
-          // Enviar projeto ao backend
-          axios
-            .post("/adicionar", projetoComImagens)
-            .then(() => finalizarComSucesso(projetoComImagens))
-            .catch((error) => finalizarComErro("Erro ao adicionar projeto:", error, [imagemUrl]));
-        }
-      })
-      .catch((error) => finalizarComErro("Erro ao fazer upload da imagem principal:", error));
+  const handleImagensPasso = (e) => {
+    const arquivos = [...e.target.files];
+    if (arquivos.length > LIMITE_IMAGENS_PASSO) {
+      alert(`Selecione no máximo ${LIMITE_IMAGENS_PASSO} imagens do passo a passo.`);
+      e.target.value = "";
+      setImagensPassoPreview([]);
+      return;
+    }
+    setImagensPassoPreview(arquivos);
   };
 
   return (
@@ -254,11 +216,11 @@ function AdicionarProjeto() {
                 <input
                   id="imagensPasso"
                   type="file"
-                  accept="image/*"
+                  accept={FORMATOS_ACEITOS}
                   multiple
-                  onChange={(e) => setImagensPassoPreview([...e.target.files])}
+                  onChange={handleImagensPasso}
                 />
-                <span className="field-hint">Você pode selecionar até 4 imagens.</span>
+                <span className="field-hint">Você pode selecionar até 4 imagens (JPG ou PNG).</span>
               </div>
               {imagensPassoPreview.length > 0 && (
                 <div className="preview-grid">
@@ -362,8 +324,8 @@ function AdicionarProjeto() {
                 <input
                   id="imagemPrincipal"
                   type="file"
-                  accept="image/*"
-                  onChange={(e) => setImagemPreview(e.target.files[0])}
+                  accept={FORMATOS_ACEITOS}
+                  onChange={(e) => setImagemPreview(e.target.files[0] || null)}
                 />
               </div>
               {imagemPreview && (
