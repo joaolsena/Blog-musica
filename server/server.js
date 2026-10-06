@@ -3,7 +3,6 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const cloudinary = require("cloudinary").v2;
 const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const crypto = require("crypto");
 require("dotenv").config();
 
@@ -13,8 +12,14 @@ const app = express();
 app.set("trust proxy", 1);
 
 // **Middleware**
-app.use(cors());
+// CORS_ORIGIN (opcional): endereços do site separados por vírgula, ex.:
+// https://ensinemusica.netlify.app. Sem ela, qualquer origem é aceita — o que é
+// seguro aqui, porque as rotas de escrita exigem o token no cabeçalho.
+app.use(cors(process.env.CORS_ORIGIN ? { origin: process.env.CORS_ORIGIN.split(",").map((o) => o.trim()) } : undefined));
 app.use(express.json());
+
+// Todas as rotas da API ficam em /api, separadas das páginas do site
+const api = express.Router();
 
 // **Autenticação do professor**
 // A senha fica só no servidor (variável ADMIN_PASSWORD). Quem acerta a senha recebe um
@@ -74,7 +79,7 @@ const LIMITE_TENTATIVAS = 5;
 const JANELA_TENTATIVAS_MS = 15 * 60 * 1000;
 const tentativasPorIp = new Map();
 
-app.post("/auth/login", (req, res) => {
+api.post("/auth/login", (req, res) => {
   if (!autenticacaoConfigurada) {
     return res.status(503).send("Autenticação não configurada no servidor");
   }
@@ -121,16 +126,21 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// **Configuração do Multer com Cloudinary**
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "projetos", // pasta para as imagens
-    allowed_formats: ["jpg", "jpeg", "png"], // formatos permitidos
+// **Recebimento de imagens**
+// O multer guarda o arquivo na memória; depois ele é enviado ao Cloudinary (ver subirParaCloudinary).
+const TAMANHO_MAXIMO_IMAGEM = 10 * 1024 * 1024; // 10 MB, o limite do plano gratuito do Cloudinary
+const FORMATOS_ACEITOS = ["image/jpeg", "image/png"];
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: TAMANHO_MAXIMO_IMAGEM, files: 5 },
+  fileFilter: (req, arquivo, cb) => {
+    if (FORMATOS_ACEITOS.includes(arquivo.mimetype)) return cb(null, true);
+    const erro = new Error("Formato de imagem não aceito. Use JPG ou PNG.");
+    erro.status = 415;
+    cb(erro);
   },
 });
-
-const upload = multer({ storage });
 
 // **Remoção de imagens do Cloudinary**
 // Extrai o public_id de uma URL do Cloudinary, ex.:
@@ -157,6 +167,41 @@ const apagarImagens = async (urls) => {
   );
 };
 
+// Envia uma imagem ao Cloudinary já reduzida: no máximo 2000px no maior lado e
+// qualidade automática. Fotos de celular de vários MB ficam com algumas centenas de KB.
+const enviarParaCloudinary = (arquivo) =>
+  new Promise((resolve, reject) => {
+    cloudinary.uploader
+      .upload_stream(
+        {
+          folder: "projetos",
+          allowed_formats: ["jpg", "jpeg", "png"],
+          transformation: [{ width: 2000, height: 2000, crop: "limit", quality: "auto:good" }],
+        },
+        (erro, resultado) => (erro ? reject(erro) : resolve(resultado.secure_url))
+      )
+      .end(arquivo.buffer);
+  });
+
+// Depois do multer: sobe os arquivos recebidos e coloca a URL em arquivo.path.
+// Se algum envio falhar, apaga os que já subiram, para não deixar imagens soltas.
+const subirParaCloudinary = async (req, res, next) => {
+  const arquivos = [req.file, ...(req.files || [])].filter(Boolean);
+  const enviados = [];
+  try {
+    await Promise.all(
+      arquivos.map(async (arquivo) => {
+        arquivo.path = await enviarParaCloudinary(arquivo);
+        enviados.push(arquivo.path);
+      })
+    );
+    next();
+  } catch (erro) {
+    await apagarImagens(enviados);
+    next(erro);
+  }
+};
+
 // **Modelo do MongoDB**
 const Projeto = mongoose.model("Projeto", {
   titulo: String,
@@ -177,7 +222,7 @@ const Projeto = mongoose.model("Projeto", {
 
 // **Rotas**
 // Rota para obter todos os projetos
-app.get("/projetos", async (req, res) => {
+api.get("/projetos", async (req, res) => {
   try {
     const projetos = await Projeto.find();
     res.json(projetos);
@@ -188,7 +233,7 @@ app.get("/projetos", async (req, res) => {
 });
 
 // Rota para obter um projeto pelo ID
-app.get("/projetos/:id", async (req, res) => {
+api.get("/projetos/:id", async (req, res) => {
   try {
     const projeto = await Projeto.findById(req.params.id);
     if (!projeto) {
@@ -202,7 +247,7 @@ app.get("/projetos/:id", async (req, res) => {
 });
 
 // Rota para adicionar um novo projeto
-app.post("/adicionar", exigirAdmin, upload.single("imagem"), async (req, res) => {
+api.post("/adicionar", exigirAdmin, upload.single("imagem"), subirParaCloudinary, async (req, res) => {
   try {
     // Criar o objeto de projeto a partir do corpo da requisição
     const projetoData = { ...req.body, data: req.body.data || new Date().toLocaleDateString("pt-BR") };
@@ -224,7 +269,7 @@ app.post("/adicionar", exigirAdmin, upload.single("imagem"), async (req, res) =>
 });
 
 // Rota para editar um projeto existente
-app.put("/projetos/:id", exigirAdmin, upload.single("imagem"), async (req, res) => {
+api.put("/projetos/:id", exigirAdmin, upload.single("imagem"), subirParaCloudinary, async (req, res) => {
   try {
     const projetoData = { ...req.body };
 
@@ -253,7 +298,7 @@ app.put("/projetos/:id", exigirAdmin, upload.single("imagem"), async (req, res) 
 });
 
 // Rota para excluir um projeto
-app.delete("/projetos/:id", exigirAdmin, async (req, res) => {
+api.delete("/projetos/:id", exigirAdmin, async (req, res) => {
   try {
     const projetoRemovido = await Projeto.findByIdAndDelete(req.params.id);
 
@@ -271,8 +316,11 @@ app.delete("/projetos/:id", exigirAdmin, async (req, res) => {
 });
 
 // Rota para upload de imagem principal
-app.post("/upload", exigirAdmin, upload.single("imagem"), (req, res) => {
+api.post("/upload", exigirAdmin, upload.single("imagem"), subirParaCloudinary, (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).send("Nenhuma imagem foi enviada.");
+    }
     const imagemUrl = req.file.path; // URL do Cloudinary
     res.status(200).json({ url: imagemUrl });
   } catch (error) {
@@ -282,7 +330,7 @@ app.post("/upload", exigirAdmin, upload.single("imagem"), (req, res) => {
 });
 
 // Rota para upload de imagens múltiplas (passo a passo)
-app.post("/upload-multiplas", exigirAdmin, upload.array("imagensPassoAPasso", 4), async (req, res) => {
+api.post("/upload-multiplas", exigirAdmin, upload.array("imagensPassoAPasso", 4), subirParaCloudinary, async (req, res) => {
   try {
     // Verifique se os arquivos foram enviados
     const imagens = req.files ? req.files.map((file) => file.path) : [];
@@ -312,7 +360,7 @@ app.post("/upload-multiplas", exigirAdmin, upload.array("imagensPassoAPasso", 4)
 });
 
 // Rota para remover imagens enviadas cujo projeto não chegou a ser salvo
-app.post("/imagens/remover", exigirAdmin, async (req, res) => {
+api.post("/imagens/remover", exigirAdmin, async (req, res) => {
   try {
     const urls = Array.isArray(req.body.urls) ? req.body.urls.filter((url) => typeof url === "string") : [];
 
@@ -329,6 +377,27 @@ app.post("/imagens/remover", exigirAdmin, async (req, res) => {
     console.error("Erro ao remover imagens:", error);
     res.status(500).send("Erro ao remover imagens");
   }
+});
+
+app.use("/api", api);
+
+// Erros de envio de imagem viram respostas claras em vez de um erro 500 genérico.
+// O Express só reconhece um tratador de erros com 4 parâmetros, por isso o "next" fica mesmo sem uso.
+app.use((erro, req, res, next) => {
+  if (erro instanceof multer.MulterError) {
+    const mensagens = {
+      LIMIT_FILE_SIZE: "Imagem muito grande. O limite é 10 MB por imagem.",
+      LIMIT_FILE_COUNT: "Imagens demais. Envie no máximo 4 imagens do passo a passo.",
+      LIMIT_UNEXPECTED_FILE: "Imagens demais. Envie no máximo 4 imagens do passo a passo.",
+    };
+    const status = erro.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+    return res.status(status).send(mensagens[erro.code] || "Envio de imagem inválido.");
+  }
+  if (erro.status === 415) {
+    return res.status(415).send(erro.message);
+  }
+  console.error("Erro inesperado:", erro);
+  res.status(500).send("Erro interno no servidor");
 });
 
 // **Servidor**

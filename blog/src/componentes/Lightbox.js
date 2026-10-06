@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { urlImagem } from "./imagens";
 
 const DURACAO_SAIDA = 180; // ms — a saída é mais rápida que a entrada
 
@@ -50,7 +51,7 @@ function Lightbox({ imagens, indiceInicial, onClose }) {
       onClick={fechar}
     >
       <figure className="lightbox__figure" onClick={(e) => e.stopPropagation()}>
-        <img src={imagem.src} alt={imagem.legenda} />
+        <img src={urlImagem(imagem.src, 2000)} alt={imagem.legenda} />
         <figcaption>
           {imagem.legenda}
           {total > 1 && (

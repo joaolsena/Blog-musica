@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import Pauta from "./Pauta";
 import RevealOnScroll from "./RevealOnScroll";
 import { rotuloTipo } from "./tipos";
+import { srcSetImagem, urlImagem } from "./imagens";
 
 const FILTROS = [
   { valor: "todos", rotulo: "Todos" },
@@ -72,9 +73,22 @@ function FiltroSegmentado({ valor, onChange, contagem }) {
   );
 }
 
-function CapaProjeto({ projeto }) {
+// Larguras geradas pelo Cloudinary; o navegador escolhe a menor que serve para a tela
+const LARGURAS_CAPA = [400, 800, 1200, 1600];
+
+function CapaProjeto({ projeto, sizes, prioridade = false }) {
   if (projeto.imagem) {
-    return <img src={projeto.imagem} alt="" loading="lazy" decoding="async" />;
+    return (
+      <img
+        src={urlImagem(projeto.imagem, 800)}
+        srcSet={srcSetImagem(projeto.imagem, LARGURAS_CAPA)}
+        sizes={sizes}
+        alt=""
+        loading={prioridade ? "eager" : "lazy"}
+        fetchpriority={prioridade ? "high" : undefined}
+        decoding="async"
+      />
+    );
   }
   // Sem imagem: uma capa tipográfica com a pauta
   return (
@@ -89,7 +103,7 @@ function ProjetoCard({ projeto }) {
     <article className="card">
       <Link to={`/projeto/${projeto.id}`} className="card__link">
         <div className="card__media">
-          <CapaProjeto projeto={projeto} />
+          <CapaProjeto projeto={projeto} sizes="(min-width: 1200px) 380px, (min-width: 700px) 45vw, 100vw" />
         </div>
         <div className="card__body">
           {projeto.tipoProjeto && (
@@ -115,7 +129,7 @@ function Destaque({ projeto }) {
     <RevealOnScroll as="section" className="destaque" aria-label="Projeto mais recente">
       <Link to={`/projeto/${projeto.id}`} className="destaque__link">
         <div className="destaque__media">
-          <CapaProjeto projeto={projeto} />
+          <CapaProjeto projeto={projeto} sizes="(min-width: 1200px) 680px, (min-width: 900px) 58vw, 100vw" prioridade />
         </div>
         <div className="destaque__body">
           <p className="eyebrow">Mais recente</p>

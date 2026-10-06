@@ -10,6 +10,19 @@ const LIMITE_IMAGENS_PASSO = 4;
 // Formatos aceitos pelo Cloudinary no servidor (allowed_formats)
 const FORMATOS_ACEITOS = "image/jpeg,image/png";
 
+// Deve bater com TAMANHO_MAXIMO_IMAGEM no servidor (limite do plano gratuito do Cloudinary)
+const TAMANHO_MAXIMO_MB = 10;
+
+// Avisa e retorna false se algum arquivo passar do tamanho máximo
+function tamanhosValidos(arquivos) {
+  const grande = arquivos.find((arquivo) => arquivo.size > TAMANHO_MAXIMO_MB * 1024 * 1024);
+  if (grande) {
+    toast.error(`"${grande.name}" tem ${(grande.size / 1024 / 1024).toFixed(1)} MB. O limite é ${TAMANHO_MAXIMO_MB} MB por imagem.`);
+    return false;
+  }
+  return true;
+}
+
 const projetoVazio = {
   titulo: "",
   nomeMaterial: "",
@@ -91,7 +104,13 @@ function AdicionarProjeto() {
           .post("/imagens/remover", { urls: urlsEnviadas })
           .catch((erroLimpeza) => console.error("Erro ao remover imagens enviadas:", erroLimpeza));
       }
-      toast.error("Não foi possível publicar o projeto. Tente novamente.", { id: aviso });
+      // Erros de imagem (tamanho, formato, quantidade) vêm do servidor com uma mensagem clara
+      const status = error.response?.status;
+      const mensagem =
+        [400, 413, 415].includes(status) && typeof error.response.data === "string"
+          ? error.response.data
+          : "Não foi possível publicar o projeto. Tente novamente.";
+      toast.error(mensagem, { id: aviso });
       enviandoRef.current = false;
       setEnviando(false);
     }
@@ -101,6 +120,11 @@ function AdicionarProjeto() {
     const arquivos = [...e.target.files];
     if (arquivos.length > LIMITE_IMAGENS_PASSO) {
       toast.error(`Selecione no máximo ${LIMITE_IMAGENS_PASSO} imagens do passo a passo.`);
+      e.target.value = "";
+      setImagensPasso([]);
+      return;
+    }
+    if (!tamanhosValidos(arquivos)) {
       e.target.value = "";
       setImagensPasso([]);
       return;
@@ -178,7 +202,7 @@ function AdicionarProjeto() {
             <EnvioImagens
               id="imagensPasso"
               rotulo="Imagens do passo a passo"
-              dica={`Até ${LIMITE_IMAGENS_PASSO} imagens, JPG ou PNG`}
+              dica={`Até ${LIMITE_IMAGENS_PASSO} imagens, JPG ou PNG, com até ${TAMANHO_MAXIMO_MB} MB cada`}
               arquivos={imagensPasso}
               accept={FORMATOS_ACEITOS}
               multiplo
@@ -248,10 +272,18 @@ function AdicionarProjeto() {
             <EnvioImagens
               id="imagemPrincipal"
               rotulo="Imagem principal"
-              dica="JPG ou PNG — aparece na capa do projeto"
+              dica={`JPG ou PNG com até ${TAMANHO_MAXIMO_MB} MB — aparece na capa do projeto`}
               arquivos={imagemPrincipal}
               accept={FORMATOS_ACEITOS}
-              onChange={(e) => setImagemPrincipal(e.target.files[0] ? [e.target.files[0]] : [])}
+              onChange={(e) => {
+                const arquivos = e.target.files[0] ? [e.target.files[0]] : [];
+                if (!tamanhosValidos(arquivos)) {
+                  e.target.value = "";
+                  setImagemPrincipal([]);
+                  return;
+                }
+                setImagemPrincipal(arquivos);
+              }}
             />
             <Campo
               id="autor"

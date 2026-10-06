@@ -29,8 +29,7 @@ function EditProjeto() {
   useEffect(() => {
     const fetchProjeto = async () => {
       try {
-        const response = await fetch(`/projetos/${id}`);
-        const data = await response.json();
+        const { data } = await axios.get(`/projetos/${id}`);
         setProjeto((prev) => ({ ...prev, ...data }));
       } catch (error) {
         console.error("Erro ao carregar projeto:", error);

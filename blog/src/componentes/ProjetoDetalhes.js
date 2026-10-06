@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "./AuthContext"; // Importando o hook de autenticação
 import Lightbox from "./Lightbox";
 import { rotuloTipo } from "./tipos";
+import { srcSetImagem, urlImagem } from "./imagens";
 
 // Separa os campos de texto em que cada item é delimitado por ponto e vírgula
 const dividir = (texto) => (texto ? texto.split(";").map((item) => item.trim()).filter(Boolean) : []);
@@ -180,7 +181,13 @@ function ProjetoDetalhes() {
 
       {projeto.imagem && (
         <button type="button" className="artigo__capa" onClick={() => setLightbox(0)} aria-label="Ampliar imagem principal">
-          <img src={projeto.imagem} alt={projeto.titulo} />
+          <img
+            src={urlImagem(projeto.imagem, 1200)}
+            srcSet={srcSetImagem(projeto.imagem, [800, 1200, 1600, 2000])}
+            sizes="(min-width: 1240px) 1200px, 100vw"
+            alt={projeto.titulo}
+            fetchpriority="high"
+          />
         </button>
       )}
 
@@ -251,7 +258,14 @@ function ProjetoDetalhes() {
                       onClick={() => setLightbox(index + deslocamentoPassos)}
                       aria-label={`Ampliar imagem do passo ${index + 1}`}
                     >
-                      <img src={url} alt={`Passo ${index + 1} da construção`} loading="lazy" decoding="async" />
+                      <img
+                        src={urlImagem(url, 600)}
+                        srcSet={srcSetImagem(url, [400, 600, 900])}
+                        sizes="(min-width: 1024px) 340px, 50vw"
+                        alt={`Passo ${index + 1} da construção`}
+                        loading="lazy"
+                        decoding="async"
+                      />
                       <span className="galeria__label">Passo {index + 1}</span>
                     </button>
                   ))}
