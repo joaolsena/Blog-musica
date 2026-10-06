@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import Pauta from "./Pauta";
 import RevealOnScroll from "./RevealOnScroll";
 import { rotuloTipo } from "./tipos";
 import { srcSetImagem, urlImagem } from "./imagens";
+import { lerProjetosSalvos, salvarProjetos } from "./memoria";
+import { AvisoSincronia, useSincronia } from "./Sincronia";
 
 const FILTROS = [
   { valor: "todos", rotulo: "Todos" },
@@ -187,42 +189,56 @@ function Silencio({ titulo, texto, acao }) {
   );
 }
 
+// Prepara a lista do servidor: id em texto e mais recentes primeiro
+// (sem data válida vai para o final)
+function prepararLista(projetos) {
+  return projetos
+    .map((projeto) => ({ ...projeto, id: projeto._id }))
+    .sort((a, b) => {
+      const dataA = parseDataBR(a.data);
+      const dataB = parseDataBR(b.data);
+      if (dataA && dataB) return dataB - dataA;
+      if (dataA) return -1;
+      if (dataB) return 1;
+      return (a.titulo || "").localeCompare(b.titulo || "");
+    });
+}
+
 function Projetos() {
-  const [projetos, setProjetos] = useState([]);
-  const [carregando, setCarregando] = useState(true);
+  // A última lista vista neste aparelho aparece na hora; a do servidor chega depois
+  const [salvos] = useState(lerProjetosSalvos);
+  const [projetos, setProjetos] = useState(() => prepararLista(salvos?.projetos ?? []));
+  const [carregando, setCarregando] = useState(!salvos);
   const [erro, setErro] = useState(null);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("todos");
+  const [salvoEm, setSalvoEm] = useState(salvos?.salvoEm);
+  const sincronia = useSincronia();
+  const { iniciar, concluir } = sincronia;
 
-  // Carregar projetos ao montar o componente
-  useEffect(() => {
+  const buscar = useCallback(() => {
+    if (salvos) iniciar();
     axios
-      .get("/projetos")
+      .get("/projetos", { timeout: 15000 })
       .then((response) => {
-        const projetosComIdString = response.data.map((projeto) => ({
-          ...projeto,
-          id: projeto._id, // Caso o backend use MongoDB, converte o ID
-        }));
-
-        // Mais recentes primeiro; sem data válida vai para o final
-        projetosComIdString.sort((a, b) => {
-          const dataA = parseDataBR(a.data);
-          const dataB = parseDataBR(b.data);
-          if (dataA && dataB) return dataB - dataA;
-          if (dataA) return -1;
-          if (dataB) return 1;
-          return (a.titulo || "").localeCompare(b.titulo || "");
-        });
-
-        setProjetos(projetosComIdString);
+        salvarProjetos(response.data);
+        setSalvoEm(Date.now());
+        setProjetos(prepararLista(response.data));
         setErro(null);
+        if (salvos) concluir(true);
       })
       .catch((error) => {
         console.error("Erro ao carregar projetos:", error);
-        setErro("Não foi possível carregar os projetos agora. Tente novamente em instantes.");
+        // Com a versão guardada na tela, só avisa; sem ela, mostra o erro
+        if (salvos) concluir(false);
+        else setErro("Não foi possível carregar os projetos agora. Tente novamente em instantes.");
       })
       .finally(() => setCarregando(false));
-  }, []);
+  }, [salvos, iniciar, concluir]);
+
+  useEffect(() => {
+    buscar();
+  }, [buscar]);
 
   const contagem = useMemo(
     () => ({
@@ -254,6 +270,7 @@ function Projetos() {
 
   return (
     <>
+      <AvisoSincronia estado={sincronia.estado} salvoEm={salvoEm} aoTentarDeNovo={buscar} />
       <section className="hero">
         <div className="container">
           <p className="eyebrow hero__eyebrow">Educação musical na prática</p>

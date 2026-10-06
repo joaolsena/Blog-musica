@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { esquecerProjeto, lerProjetoSalvo, salvarProjeto } from "./memoria";
+import { AvisoSincronia, useSincronia } from "./Sincronia";
 import { toast } from "sonner";
 import { useAuth } from "./AuthContext"; // Importando o hook de autenticação
 import Lightbox from "./Lightbox";
@@ -52,32 +54,50 @@ function VoltarLink() {
 
 function ProjetoDetalhes() {
   const { id } = useParams(); // Pega o ID do projeto da URL
-  const [projeto, setProjeto] = useState(null); // Estado para armazenar os dados do projeto
+  // Se este projeto já foi visto neste aparelho, aparece na hora; o servidor atualiza depois
+  const [salvo] = useState(() => lerProjetoSalvo(id));
+  const [projeto, setProjeto] = useState(salvo?.projeto ?? null);
   const [erro, setErro] = useState(null); // Estado para mensagens de erro
   const [excluindo, setExcluindo] = useState(false);
   const [lightbox, setLightbox] = useState(null); // índice da imagem aberta
   const { isAuthenticated } = useAuth(); // Verifica se o usuário está logado
   const navigate = useNavigate(); // Navegação após exclusão
+  const [salvoEm, setSalvoEm] = useState(salvo?.salvoEm);
+  const sincronia = useSincronia();
+  const { iniciar, concluir } = sincronia;
 
-  useEffect(() => {
+  const buscar = useCallback(() => {
     if (!id) {
       setErro("ID do projeto não encontrado.");
       return;
     }
-
-    // Busca o projeto específico pelo ID
+    if (salvo) iniciar();
     axios
-      .get(`/projetos/${id}`)
+      .get(`/projetos/${id}`, { timeout: 15000 })
       .then((response) => {
         setProjeto(response.data);
-        setErro(null); // Limpa mensagens de erro, se houver
+        salvarProjeto(response.data);
+        setSalvoEm(Date.now());
+        setErro(null);
+        if (salvo) concluir(true);
       })
       .catch((error) => {
-        // 404: o projeto não existe; outros erros: falha de conexão ou do servidor
-        setErro(error.response?.status === 404 ? "nao-encontrado" : "falha");
         console.error("Erro ao carregar projeto:", error);
+        // 404: o projeto não existe mais (some também da memória do aparelho)
+        if (error.response?.status === 404) {
+          esquecerProjeto(id);
+          setErro("nao-encontrado");
+        } else if (salvo) {
+          concluir(false); // sem conexão: continua mostrando a versão guardada
+        } else {
+          setErro("falha");
+        }
       });
-  }, [id]);
+  }, [id, salvo, iniciar, concluir]);
+
+  useEffect(() => {
+    buscar();
+  }, [buscar]);
 
   // Título da aba do navegador com o nome do projeto
   useEffect(() => {
@@ -122,7 +142,10 @@ function ProjetoDetalhes() {
       error: "Não foi possível apagar o projeto. Tente novamente.",
     });
     pedido
-      .then(() => navigate("/")) // Redireciona para a página inicial após exclusão
+      .then(() => {
+        esquecerProjeto(id);
+        navigate("/"); // Redireciona para a página inicial após exclusão
+      })
       .catch((error) => console.error("Erro ao excluir o projeto:", error))
       .finally(() => setExcluindo(false));
   };
@@ -181,6 +204,7 @@ function ProjetoDetalhes() {
 
   return (
     <article className="container artigo">
+      <AvisoSincronia estado={sincronia.estado} salvoEm={salvoEm} aoTentarDeNovo={buscar} />
       <header className="artigo__head">
         <VoltarLink />
         {projeto.tipoProjeto && (

@@ -12,6 +12,7 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 - Área do professor, protegida por senha, para publicar, editar e apagar projetos e suas fotos
 - Modo claro e escuro, layout para computador e celular
 - Instalável como app (iPhone, iPad, Android, Mac e Windows): botão discreto no cabeçalho e no rodapé. No Chrome e no Edge abre a janela de instalação do sistema; no Safari e nos outros, mostra o passo a passo. Depois de instalado, abre sem internet o que já foi visto
+- Projetos guardados no aparelho: a última versão vista aparece na hora, com o aviso "Sincronizando…" enquanto o servidor responde (e "Sem conexão" com o horário da versão mostrada, se não houver internet)
 
 ## Tecnologias
 

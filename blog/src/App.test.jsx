@@ -129,3 +129,48 @@ describe("login", () => {
     expect(screen.getByRole("heading", { name: "Área do professor" })).toBeInTheDocument();
   });
 });
+
+describe("projetos guardados no aparelho", () => {
+  const guardar = (projetos) =>
+    localStorage.setItem("ensine-musica:projetos", JSON.stringify({ salvoEm: Date.now(), projetos }));
+
+  test("mostra na hora a última lista vista e avisa que está sincronizando", async () => {
+    guardar(PROJETOS.slice(0, 2));
+    axios.get.mockReturnValue(new Promise(() => {})); // servidor ainda não respondeu
+    abrir("/");
+
+    expect(screen.getByText("Batalha dos ritmos")).toBeInTheDocument();
+    expect(await screen.findByText("Sincronizando…")).toBeInTheDocument();
+  });
+
+  test("troca pela lista do servidor quando ela chega e guarda a nova", async () => {
+    guardar(PROJETOS.slice(0, 1));
+    axios.get.mockResolvedValue({ data: PROJETOS });
+    abrir("/");
+
+    expect(await screen.findByText("Tambor de lata")).toBeInTheDocument();
+    const guardados = JSON.parse(localStorage.getItem("ensine-musica:projetos")).projetos;
+    expect(guardados).toHaveLength(3);
+  });
+
+  test("sem conexão, continua mostrando a versão guardada", async () => {
+    silenciarErrosEsperados();
+    guardar(PROJETOS);
+    axios.get.mockRejectedValue(new Error("Network Error"));
+    abrir("/");
+
+    expect(await screen.findByText(/Sem conexão/)).toBeInTheDocument();
+    expect(screen.getByText("Tambor de lata")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeInTheDocument();
+  });
+
+  test("abre sem internet um projeto já visto", async () => {
+    silenciarErrosEsperados();
+    guardar([{ ...PROJETOS[0], descricaoGeral: "Um chocalho colorido." }]);
+    axios.get.mockRejectedValue(new Error("Network Error"));
+    abrir("/projeto/1");
+
+    expect(screen.getByRole("heading", { level: 1, name: "Chocalho de garrafa" })).toBeInTheDocument();
+    expect(await screen.findByText(/Sem conexão/)).toBeInTheDocument();
+  });
+});

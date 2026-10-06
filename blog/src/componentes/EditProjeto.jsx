@@ -13,6 +13,7 @@ import {
   tamanhosValidos,
 } from "./envioMidias";
 import CampoVideos, { urlsFinais, videosSalvos } from "./CampoVideos";
+import { esquecerProjeto } from "./memoria";
 
 // A rota já é protegida pelo PrivateRoute, então aqui o usuário está sempre autenticado
 function EditProjeto() {
@@ -134,6 +135,7 @@ function EditProjeto() {
         videos: urlsFinais(videos, midias.urlsVideos),
       });
       toast.success("Alterações salvas.", { id: aviso });
+      esquecerProjeto(id); // a página do projeto busca a versão nova, sem mostrar a antiga
       navigate(`/projeto/${id}`);
     } catch (error) {
       console.error("Erro ao editar projeto:", error);

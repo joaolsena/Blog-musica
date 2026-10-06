@@ -2835,3 +2835,104 @@
     transition: none;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Aviso de sincronização (versão guardada no aparelho × servidor)
+   -------------------------------------------------------------------------- */
+
+.sincronia {
+  position: fixed;
+  top: calc(var(--header-h) + env(safe-area-inset-top) + 8px);
+  left: 50%;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-md);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -6px) scale(0.97);
+  transition:
+    opacity 160ms ease,
+    transform 160ms var(--ease-out);
+}
+
+.sincronia[data-visivel="true"] {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translate(-50%, 0);
+  transition-duration: 240ms;
+}
+
+.sincronia[data-estado="atualizado"] svg {
+  color: #2f9e5b;
+}
+
+.sincronia[data-estado="offline"] {
+  color: var(--ink);
+}
+
+.sincronia[data-estado="offline"] svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.sincronia > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sincronia__giro {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: sincronia-giro 700ms linear infinite;
+}
+
+@keyframes sincronia-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sincronia__tentar {
+  flex: none;
+  margin: -3px -8px -3px 2px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  transition: transform 160ms var(--ease-out);
+}
+
+.sincronia__tentar:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sincronia,
+  .sincronia[data-visivel="true"] {
+    transform: translate(-50%, 0);
+  }
+
+  .sincronia__giro {
+    animation-duration: 1.6s;
+  }
+}
