@@ -5,9 +5,11 @@ import Logo from "./Logo";
 import { BotaoInstalar } from "./InstalarApp";
 import MenuConta from "./MenuConta";
 import { BotaoTema } from "./Tema";
+import { atualizarContagem, useContagemModeracao, zerarContagem } from "./contagemModeracao";
 
 function Navbar() {
   const { isAuthenticated, ehAdmin, logout } = useAuth();
+  const pendentes = useContagemModeracao();
   const [menuAberto, setMenuAberto] = useState(false);
   const [rolou, setRolou] = useState(false);
   const location = useLocation();
@@ -16,6 +18,12 @@ function Navbar() {
   useEffect(() => {
     setMenuAberto(false);
   }, [location.pathname]);
+
+  // Mensagens esperando aprovação: confere ao entrar e ao trocar de página
+  useEffect(() => {
+    if (isAuthenticated) atualizarContagem();
+    else zerarContagem();
+  }, [isAuthenticated, location.pathname]);
 
   // Cabeçalho ganha borda e fundo mais sólido depois que a página rola
   useEffect(() => {
@@ -39,6 +47,8 @@ function Navbar() {
 
   const links = [
     { to: "/", rotulo: "Projetos", end: true },
+    { to: "/planos", rotulo: "Planos de aula" },
+    { to: "/forum", rotulo: "Fórum" },
     { to: "/Ensine-Musica", rotulo: "Sobre" },
   ];
 
@@ -145,6 +155,8 @@ function Navbar() {
                 </NavLink>
               </li>
               {[
+                { to: "/novo-plano", rotulo: "Novo plano de aula" },
+                { to: "/moderacao", rotulo: "Moderação", contagem: pendentes },
                 { to: "/minha-conta", rotulo: "Minha conta" },
                 ...(ehAdmin
                   ? [
@@ -156,10 +168,15 @@ function Navbar() {
                 <li key={link.to} style={{ "--i": links.length + 1 + index }}>
                   <NavLink to={link.to} className="mobile-menu__link">
                     {link.rotulo}
+                    {link.contagem > 0 && (
+                      <span className="contagem-pendentes" aria-label={`${link.contagem} esperando aprovação`}>
+                        {link.contagem}
+                      </span>
+                    )}
                   </NavLink>
                 </li>
               ))}
-              <li style={{ "--i": links.length + (ehAdmin ? 4 : 2) }}>
+              <li style={{ "--i": links.length + (ehAdmin ? 6 : 4) }}>
                 <button
                   type="button"
                   className="mobile-menu__link"

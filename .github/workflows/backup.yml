@@ -4,8 +4,9 @@
 # site e guarda uma cópia datada na branch "backups" deste repositório. Também dá para
 # rodar na hora: aba Actions > Backup dos projetos > Run workflow.
 #
-# O arquivo tem os textos dos projetos e os endereços das fotos e vídeos (que ficam no
-# Cloudinary). Para restaurar: entre no site como professor > Backup > Restaurar.
+# O arquivo tem os textos dos projetos e dos planos de aula e os endereços das fotos e
+# vídeos (que ficam no Cloudinary). O fórum e os comentários entram só no backup baixado
+# pelo site (Backup > Baixar). Para restaurar: entre no site como professor > Backup > Restaurar.
 # Se o GitHub não conseguir falar com o site, a execução falha e o GitHub avisa por e-mail.
 
 name: Backup dos projetos
@@ -30,11 +31,14 @@ jobs:
       # (Settings > Secrets and variables > Actions > Variables), ex.: https://ensinemusica.com.br
       SITE: ${{ vars.SITE_URL || 'https://ensine-musica.vercel.app' }}
     steps:
-      - name: Baixar os projetos do site
+      - name: Baixar os projetos e os planos de aula do site
         run: |
-          curl --fail --silent --show-error --retry 3 --retry-delay 10 --max-time 60 \
-            "$SITE/api/projetos" -o projetos.json
-          # Confere que veio uma lista de projetos (e não uma página de erro)
+          for lista in projetos planos; do
+            curl --fail --silent --show-error --retry 3 --retry-delay 10 --max-time 60 \
+              "$SITE/api/$lista" -o "$lista.json"
+          done
+          # Confere que vieram listas (e não uma página de erro)
+          python3 -c 'import json; assert isinstance(json.load(open("planos.json")), list)'
           TOTAL=$(python3 -c 'import json; d = json.load(open("projetos.json")); assert isinstance(d, list); print(len(d))')
           echo "TOTAL=$TOTAL" >> "$GITHUB_ENV"
           echo "Projetos baixados: $TOTAL"
@@ -56,7 +60,8 @@ jobs:
           python3 -c "
           import json, datetime
           projetos = json.load(open('../projetos.json'))
-          backup = {'site': 'Ensine Música', 'geradoEm': datetime.datetime.utcnow().isoformat() + 'Z', 'total': len(projetos), 'projetos': projetos}
+          planos = json.load(open('../planos.json'))
+          backup = {'site': 'Ensine Música', 'geradoEm': datetime.datetime.utcnow().isoformat() + 'Z', 'total': len(projetos), 'projetos': projetos, 'planos': planos}
           json.dump(backup, open('backups/$HOJE.json', 'w'), ensure_ascii=False, indent=1)
           "
           cp "backups/$HOJE.json" ultimo-backup.json

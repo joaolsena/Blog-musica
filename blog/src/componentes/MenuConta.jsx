@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import { useContagemModeracao } from "./contagemModeracao";
 
 // Iniciais para o círculo da conta: "Ana Beatriz Costa" → "AC"
 export function iniciais(nome = "") {
@@ -16,6 +17,7 @@ export const ROTULO_PAPEL = { admin: "Administrador", autor: "Autor" };
 // Menu da conta no cabeçalho (computador): iniciais + primeiro nome, abre as opções
 function MenuConta() {
   const { usuario, ehAdmin, logout } = useAuth();
+  const pendentes = useContagemModeracao();
   const [aberto, setAberto] = useState(false);
   const raiz = useRef(null);
   const botao = useRef(null);
@@ -51,13 +53,18 @@ function MenuConta() {
         className="conta__botao"
         aria-expanded={aberto}
         aria-controls={menuId}
-        aria-label={`Conta de ${usuario.nome}`}
+        aria-label={`Conta de ${usuario.nome}${pendentes > 0 ? `, ${pendentes} mensagens esperando aprovação` : ""}`}
         onClick={() => setAberto((a) => !a)}
       >
         <span className="conta__avatar" aria-hidden="true">
           {iniciais(usuario.nome)}
         </span>
         <span className="conta__nome">{primeiroNome}</span>
+        {pendentes > 0 && (
+          <span className="contagem-pendentes" aria-label={`${pendentes} esperando aprovação`}>
+            {pendentes}
+          </span>
+        )}
         <svg className="conta__seta" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m6 9 6 6 6-6" />
@@ -69,6 +76,13 @@ function MenuConta() {
           <strong>{usuario.nome}</strong>
           <span>{usuario.email || ROTULO_PAPEL[usuario.papel]}</span>
         </div>
+        <Link to="/novo-plano" className="conta__item">
+          Novo plano de aula
+        </Link>
+        <Link to="/moderacao" className="conta__item">
+          Moderação
+          {pendentes > 0 && <span className="contagem-pendentes">{pendentes}</span>}
+        </Link>
         <Link to="/minha-conta" className="conta__item">
           Minha conta
         </Link>

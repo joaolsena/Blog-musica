@@ -8,7 +8,7 @@ import sansItalico from "../assets/fontes/instrument-sans-latin-400-italic.woff?
 import sansNegritoItalico from "../assets/fontes/instrument-sans-latin-600-italic.woff?url";
 import serif from "../assets/fontes/instrument-serif-latin-400-normal.woff?url";
 import serifItalico from "../assets/fontes/instrument-serif-latin-400-italic.woff?url";
-import { montarDocumento, nomeDoArquivo } from "./pdfProjeto";
+import { montarDocumento, montarDocumentoPlano, nomeDoArquivo } from "./pdfProjeto";
 
 // O pdfmake busca as fontes pelo endereço completo
 const absoluto = (url) => new URL(url, window.location.href).href;
@@ -96,4 +96,9 @@ export async function baixarPdf(projeto, endereco) {
   const documento = montarDocumento(projeto, { fotos, endereco });
   const blob = await pdfMake.createPdf(documento).getBlob();
   await entregar(blob, nomeDoArquivo(projeto.titulo));
+}
+
+export async function baixarPdfPlano(plano, endereco) {
+  const blob = await pdfMake.createPdf(montarDocumentoPlano(plano, { endereco })).getBlob();
+  await entregar(blob, nomeDoArquivo(`plano de aula ${plano.titulo}`));
 }

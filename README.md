@@ -7,12 +7,15 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 ## Funcionalidades
 
 - Lista de projetos com busca e filtro por tipo (instrumento ou jogo)
+- **Planos de aula**: escritos pelos professores com conta, com objetivos, materiais, etapas da aula, avaliação, dicas e links para os projetos usados. Filtro por turma, busca, PDF e comentários
+- **Fórum** com categorias (Dúvidas, Ideias e adaptações, Relatos de sala de aula, Materiais), busca e respostas
+- **Comentários** em cada projeto e plano de aula. Visitantes participam só com o nome, sem cadastro; a mensagem aparece depois que alguém com conta aprova na página **Moderação** (o número de mensagens esperando aparece no menu da conta). Professores logados publicam na hora, com o selo "Professor". Proteção contra spam: campo escondido para robôs e no máximo 5 envios a cada 10 minutos por visitante. O servidor não guarda e-mail nem IP de quem comenta
 - Página de cada projeto: materiais, passo a passo com até 20 fotos, vídeos (link do YouTube ou arquivo enviado), instruções de uso e aplicação didática
 - Ficha de cada projeto (para quem é, nível e duração) e filtros por turma, nível e duração na página inicial
 - Botão "Baixar PDF" em cada projeto: arquivo pronto para imprimir, com capa, ficha, materiais em lista para marcar, fotos do passo a passo com legendas e links dos vídeos. Os textos longos saem justificados; as referências, alinhadas à esquerda. O PDF é gerado no próprio navegador, com as fontes do site (`blog/src/assets/fontes`, licença OFL)
 - Prévia própria de cada projeto ao compartilhar o link (título, descrição e foto no WhatsApp, Facebook etc.) e sitemap para o Google
 - Rascunho automático ao cadastrar um projeto: textos, fotos e vídeos voltam se a página recarregar
-- Backup: botão para baixar e restaurar (área do professor) e cópia automática toda segunda-feira no GitHub (branch `backups`)
+- Backup: botão para baixar e restaurar tudo (projetos, planos de aula, fórum e comentários) e cópia automática dos projetos e planos toda segunda-feira no GitHub (branch `backups`)
 - Botão de compartilhar: menu nativo do celular (WhatsApp, Instagram etc.) ou, no computador, WhatsApp, Telegram, Facebook, e-mail e "copiar link"
 - Contas individuais: **administradores** (tudo, inclusive contas e backup) e **autores** (publicam e editam só os próprios projetos). Conta nova recebe senha temporária e cria a própria no primeiro acesso. A senha principal (`ADMIN_PASSWORD`, com o e-mail em branco no login) continua valendo como chave reserva
 - Legenda em cada foto do passo a passo (aparece embaixo da foto, na tela cheia e para leitores de tela)
@@ -43,7 +46,9 @@ blog/                  site em React (Vite)
   vite.config.js       porta, proxy para o servidor e testes
   .env.production      endereço público do site (prévia de links)
 server/
-  server.js            API (rotas em /api)
+  server.js            API (rotas em /api), contas, projetos, backup e prévias de links
+  planos.js            planos de aula
+  comunidade.js        comentários, fórum e moderação
   server.test.js       testes da API
   .env.example         modelo das variáveis de ambiente
 api/index.js           entrada do servidor no Vercel (usa server/server.js)
@@ -123,7 +128,7 @@ Site e servidor ficam no mesmo projeto do Vercel (`ensine-musica`). O `vercel.js
 2. No MongoDB Atlas, em Network Access, libere o acesso de qualquer IP (`0.0.0.0/0`): o Vercel não tem IP fixo.
 3. Publique com `vercel deploy --prod` na raiz do repositório (ou conecte o repositório do GitHub ao projeto para publicar a cada push).
 
-**Backup automático:** `.github/workflows/backup.yml` roda toda segunda-feira às 6h (horário de Belém), baixa os projetos de `/api/projetos` e guarda uma cópia datada na branch `backups`. Para rodar na hora: aba Actions do GitHub > Backup dos projetos > Run workflow. Para restaurar, entre no site como professor > Backup > Restaurar. Com domínio próprio, crie a variável `SITE_URL` do repositório (veja abaixo).
+**Backup automático:** `.github/workflows/backup.yml` roda toda segunda-feira às 6h (horário de Belém), baixa os projetos de `/api/projetos` e os planos de `/api/planos` e guarda uma cópia datada na branch `backups`. Para rodar na hora: aba Actions do GitHub > Backup dos projetos > Run workflow. Para restaurar, entre no site como professor > Backup > Restaurar. Com domínio próprio, crie a variável `SITE_URL` do repositório (veja abaixo).
 
 **Domínio próprio** (ex.: `ensinemusica.com.br`, comprado no [Registro.br](https://registro.br)):
 1. No Vercel: projeto `ensine-musica` > Settings > Domains > Add, e digite o domínio. O Vercel mostra os registros de DNS.
@@ -155,10 +160,26 @@ Todas começam com `/api`. As marcadas com 🔒 exigem o token de login no cabe�
 | POST | `/upload` 🔒 | Envia uma imagem (JPG/PNG, até 10 MB); uma por requisição |
 | POST | `/videos/assinatura` 🔒 | Autoriza o navegador a enviar um vídeo (até 100 MB) direto ao Cloudinary |
 | POST | `/midias/remover` 🔒 | Apaga imagens e vídeos enviados que não ficaram em nenhum projeto |
-| GET | `/backup` 👑 | Baixa todos os projetos num arquivo JSON |
-| POST | `/backup/restaurar` 👑 | Recria, a partir de um backup, os projetos que não existem mais (nunca sobrescreve) |
+| GET | `/planos` | Lista os planos de aula (com título e capa dos projetos usados) |
+| GET | `/planos/:id` | Um plano de aula |
+| POST | `/planos` 🔒 | Publica um plano de aula (até 10 projetos relacionados) |
+| PUT | `/planos/:id` 🔒 | Edita um plano (autores, só os próprios) |
+| DELETE | `/planos/:id` 🔒 | Apaga um plano e os comentários dele |
+| GET | `/comentarios?tipo=&alvo=` | Comentários aprovados de um projeto, plano (`tipo` = `projeto` ou `plano`) ou tópico do fórum (`topico`) |
+| POST | `/comentarios` | Envia um comentário (`{ tipo, alvo, nome, texto }`). Visitante: fica pendente (202). Com login: publicado na hora (201) |
+| DELETE | `/comentarios/:id` 🔒 | Apaga ou recusa um comentário |
+| GET | `/forum` | Tópicos aprovados, do mais movimentado para o mais antigo |
+| GET | `/forum/:id` | Um tópico aprovado |
+| POST | `/forum` | Abre um tópico (`{ titulo, texto, categoria, nome }`), com as mesmas regras dos comentários |
+| DELETE | `/forum/:id` 🔒 | Apaga ou recusa um tópico e as respostas dele |
+| GET | `/moderacao` 🔒 | Comentários e tópicos esperando aprovação |
+| GET | `/moderacao/contagem` 🔒 | Quantos estão esperando |
+| POST | `/moderacao/comentarios/:id/aprovar` 🔒 | Publica um comentário |
+| POST | `/moderacao/topicos/:id/aprovar` 🔒 | Publica um tópico |
+| GET | `/backup` 👑 | Baixa projetos, planos de aula, tópicos e comentários num arquivo JSON |
+| POST | `/backup/restaurar` 👑 | Recria, a partir de um backup, o que não existe mais (nunca sobrescreve). Aceita backups antigos, só com projetos |
 
-Fora da API, o servidor também responde `/projeto/:id` (a página do site com título, descrição e foto do projeto para a prévia de links), `/sitemap.xml` e `/robots.txt`. No Vercel, essas rotas são encaminhadas ao servidor pelo `vercel.json`.
+Fora da API, o servidor também responde `/projeto/:id`, `/plano/:id` e `/forum/:id` (a página do site com título, descrição e foto para a prévia de links), `/sitemap.xml` e `/robots.txt`. No Vercel, essas rotas são encaminhadas ao servidor pelo `vercel.json`.
 
 Vídeos aceitos ao salvar: links do YouTube (`https://www.youtube.com/watch?v=...`) ou vídeos da pasta `videos/` desta conta do Cloudinary. Qualquer outro endereço é recusado.
 

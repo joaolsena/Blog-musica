@@ -15,6 +15,8 @@ function Footer() {
 
           <nav className="footer__nav" aria-label="Rodapé">
             <Link to="/">Projetos</Link>
+            <Link to="/planos">Planos de aula</Link>
+            <Link to="/forum">Fórum</Link>
             <Link to="/Ensine-Musica">Sobre</Link>
             <BotaoInstalar variante="link" />
           </nav>

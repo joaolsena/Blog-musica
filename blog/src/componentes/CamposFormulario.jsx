@@ -58,7 +58,8 @@ export function TipoProjeto({ valor, onChange, nome = "tipoProjeto" }) {
 
 // Ficha do projeto: para quem é (várias), nível e duração. Tudo opcional.
 // valor = { faixasEtarias: [], nivel: "", duracao: "" }; onChange(campo, novoValor)
-export function FichaProjeto({ valor, onChange }) {
+// Planos de aula usam a mesma ficha sem o nível (semNivel).
+export function FichaProjeto({ valor, onChange, semNivel = false, dicaFaixas = "Marque todas as turmas em que o projeto funciona bem" }) {
   const faixas = valor.faixasEtarias || [];
   const alternarFaixa = (faixa) =>
     onChange("faixasEtarias", faixas.includes(faixa) ? faixas.filter((f) => f !== faixa) : [...faixas, faixa]);
@@ -107,9 +108,9 @@ export function FichaProjeto({ valor, onChange }) {
             </label>
           ))}
         </div>
-        <p className="field__hint">Marque todas as turmas em que o projeto funciona bem</p>
+        <p className="field__hint">{dicaFaixas}</p>
       </fieldset>
-      {escolhaUnica("nivel", "Nível de dificuldade", NIVEIS)}
+      {!semNivel && escolhaUnica("nivel", "Nível de dificuldade", NIVEIS)}
       {escolhaUnica("duracao", "Duração", DURACOES)}
     </>
   );

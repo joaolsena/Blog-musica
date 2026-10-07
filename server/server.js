@@ -25,7 +25,7 @@ const api = express.Router();
 // (sem isso, o MongoDB lançaria um erro e a resposta seria um 500 genérico)
 api.param("id", (req, res, next, id) => {
   if (/^[0-9a-f]{24}$/i.test(id)) return next();
-  res.status(404).send("Projeto não encontrado");
+  res.status(404).send("Não encontrado");
 });
 
 // Data de hoje no fuso do Amapá. O servidor costuma rodar em UTC, e sem o fuso
@@ -82,32 +82,44 @@ const lerToken = (token) => {
 
 const CONTA_PRINCIPAL = { id: null, nome: "Administrador", email: null, papel: "admin", principal: true };
 
+// Descobre a conta do token enviado no pedido: { usuario } ou, se não der, { status, mensagem }.
+// Uma conta desativada perde o acesso na hora, mesmo com um token ainda válido.
+const contaDoPedido = async (req) => {
+  if (!autenticacaoConfigurada) return { status: 503, mensagem: "Autenticação não configurada no servidor" };
+  const conteudo = lerToken((req.get("Authorization") || "").replace(/^Bearer /, ""));
+  if (!conteudo) return { status: 401, mensagem: "Acesso não autorizado" };
+  if (!conteudo.uid) {
+    if (!senhaPrincipalAtiva) return { status: 401, mensagem: "A senha principal foi desativada. Entre com a sua conta." };
+    return { usuario: CONTA_PRINCIPAL };
+  }
+  const conta = await Usuario.findById(conteudo.uid).lean();
+  if (!conta || !conta.ativo) return { status: 401, mensagem: "Conta desativada ou removida" };
+  return { usuario: { id: String(conta._id), nome: conta.nome, email: conta.email, papel: conta.papel } };
+};
+
 // Protege as rotas de escrita. Fica antes do multer, para que um envio sem
 // permissão seja recusado antes de qualquer imagem subir para o Cloudinary.
-// Coloca em req.usuario quem está fazendo o pedido. Uma conta desativada perde o
-// acesso na hora, mesmo com um token ainda válido.
+// Coloca em req.usuario quem está fazendo o pedido.
 const exigirLogin = async (req, res, next) => {
-  if (!autenticacaoConfigurada) {
-    return res.status(503).send("Autenticação não configurada no servidor");
-  }
-  const conteudo = lerToken((req.get("Authorization") || "").replace(/^Bearer /, ""));
-  if (!conteudo) {
-    return res.status(401).send("Acesso não autorizado");
-  }
-  if (!conteudo.uid) {
-    if (!senhaPrincipalAtiva) return res.status(401).send("A senha principal foi desativada. Entre com a sua conta.");
-    req.usuario = CONTA_PRINCIPAL;
-    return next();
-  }
   try {
-    const conta = await Usuario.findById(conteudo.uid).lean();
-    if (!conta || !conta.ativo) return res.status(401).send("Conta desativada ou removida");
-    req.usuario = { id: String(conta._id), nome: conta.nome, email: conta.email, papel: conta.papel };
+    const { usuario, status, mensagem } = await contaDoPedido(req);
+    if (!usuario) return res.status(status).send(mensagem);
+    req.usuario = usuario;
     next();
   } catch (error) {
     console.error("Erro ao conferir a conta:", error);
     res.status(500).send("Erro ao conferir a conta");
   }
+};
+
+// Login opcional (comentários e fórum): quem está logado fica em req.usuario; visitantes, null
+const identificar = async (req, res, next) => {
+  try {
+    req.usuario = (await contaDoPedido(req)).usuario || null;
+  } catch {
+    req.usuario = null;
+  }
+  next();
 };
 
 // Só administradores (backup e gerenciamento de contas)
@@ -439,6 +451,20 @@ const limparCamposDoServidor = (req, res, next) => {
   next();
 };
 
+// **Planos de aula, comentários e fórum** (planos.js e comunidade.js)
+const { Plano, registrarPlanos } = require("./planos");
+const { Comentario, Topico, registrarComunidade, apagarComentariosDe } = require("./comunidade");
+
+registrarPlanos(api, {
+  exigirLogin,
+  limparCamposDoServidor,
+  validarFicha,
+  podeMexer: podeMexerNoProjeto,
+  dataDeHoje,
+  aoApagar: (id) => apagarComentariosDe("plano", id),
+});
+registrarComunidade(api, { exigirLogin, identificar, modelos: { projeto: Projeto, plano: Plano } });
+
 // **Rotas**
 // Rota para obter todos os projetos
 api.get("/projetos", async (req, res) => {
@@ -524,6 +550,7 @@ api.delete("/projetos/:id", exigirLogin, async (req, res) => {
     }
 
     await apagarMidias(midiasDoProjeto(projetoRemovido));
+    await apagarComentariosDe("projeto", projetoRemovido._id);
 
     res.status(200).send("Projeto excluído com sucesso");
   } catch (error) {
@@ -681,38 +708,57 @@ api.post("/usuarios/:uid/nova-senha", exigirAdmin, async (req, res) => {
 });
 
 // **Backup**
-// Baixa todos os projetos num arquivo JSON. As fotos e vídeos continuam no Cloudinary;
-// o backup guarda os endereços deles.
+// Baixa tudo num arquivo JSON: projetos, planos de aula, tópicos do fórum e comentários.
+// As fotos e vídeos continuam no Cloudinary; o backup guarda os endereços deles.
+const COLECOES_BACKUP = [
+  ["projetos", Projeto],
+  ["planos", Plano],
+  ["topicos", Topico],
+  ["comentarios", Comentario],
+];
+
 api.get("/backup", exigirAdmin, async (req, res) => {
   try {
-    const projetos = await Projeto.find().lean();
+    const dados = {};
+    for (const [nome, Modelo] of COLECOES_BACKUP) dados[nome] = await Modelo.find().lean();
     const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Belem" }); // AAAA-MM-DD
     res.setHeader("Content-Disposition", `attachment; filename="ensine-musica-backup-${hoje}.json"`);
-    res.json({ site: "Ensine Música", geradoEm: new Date().toISOString(), total: projetos.length, projetos });
+    res.json({ site: "Ensine Música", geradoEm: new Date().toISOString(), total: dados.projetos.length, ...dados });
   } catch (error) {
     console.error("Erro ao gerar backup:", error);
     res.status(500).send("Erro ao gerar backup");
   }
 });
 
-// Restaura um backup: recria só os projetos que não existem mais (nunca sobrescreve)
+// Recria, de uma lista do backup, só os itens que não existem mais (nunca sobrescreve)
+async function restaurarColecao(Modelo, lista, ajustar = (item) => item) {
+  const validos = lista.filter((item) => item && typeof item === "object" && /^[0-9a-f]{24}$/i.test(String(item._id)));
+  const existentes = new Set(
+    (await Modelo.find({ _id: { $in: validos.map((item) => item._id) } }, { _id: 1 }).lean()).map((item) => String(item._id))
+  );
+  const novos = validos.filter((item) => !existentes.has(String(item._id))).map(ajustar);
+  if (novos.length > 0) await Modelo.insertMany(novos);
+  return { restaurados: novos.length, jaExistiam: existentes.size, ignorados: lista.length - validos.length };
+}
+
+// Restaura um backup. Aceita também os backups antigos, que só tinham projetos.
 api.post("/backup/restaurar", exigirAdmin, async (req, res) => {
-  const lista = Array.isArray(req.body) ? req.body : req.body?.projetos;
-  if (!Array.isArray(lista)) {
+  const corpo = Array.isArray(req.body) ? { projetos: req.body } : req.body || {};
+  if (!Array.isArray(corpo.projetos)) {
     return res.status(400).send("Arquivo de backup inválido: não encontrei a lista de projetos.");
   }
   try {
-    const validos = lista.filter(
-      (p) => p && typeof p === "object" && /^[0-9a-f]{24}$/i.test(String(p._id)) && typeof p.titulo === "string"
+    const projetos = await restaurarColecao(
+      Projeto,
+      corpo.projetos.filter((p) => typeof p?.titulo === "string"),
+      (p) => ({ ...p, videos: (p.videos || []).filter(videoPermitido) })
     );
-    const existentes = new Set(
-      (await Projeto.find({ _id: { $in: validos.map((p) => p._id) } }, { _id: 1 }).lean()).map((p) => String(p._id))
-    );
-    const novos = validos
-      .filter((p) => !existentes.has(String(p._id)))
-      .map((p) => ({ ...p, videos: (p.videos || []).filter(videoPermitido) }));
-    if (novos.length > 0) await Projeto.insertMany(novos);
-    res.json({ restaurados: novos.length, jaExistiam: existentes.size, ignorados: lista.length - validos.length });
+    projetos.ignorados += corpo.projetos.filter((p) => typeof p?.titulo !== "string").length;
+    const outros = {};
+    for (const [nome, Modelo] of COLECOES_BACKUP.slice(1)) {
+      if (Array.isArray(corpo[nome])) outros[nome] = (await restaurarColecao(Modelo, corpo[nome])).restaurados;
+    }
+    res.json({ ...projetos, outros });
   } catch (error) {
     console.error("Erro ao restaurar backup:", error);
     res.status(500).send("Erro ao restaurar backup");
@@ -766,22 +812,49 @@ const imagemDePrevia = (url) =>
     ? url.replace("/image/upload/", "/image/upload/c_fill,g_auto,w_1200,h_630,q_auto,f_jpg/")
     : null;
 
-function paginaComPrevia(html, projeto, enderecoDaPagina) {
-  const titulo = `${projeto.titulo} — Ensine Música`;
-  const descricao = resumir(projeto.descricaoGeral) || "Projeto de educação musical com materiais alternativos.";
-  const imagem = imagemDePrevia(projeto.imagem);
-  let pagina = html.replace(/<title>[^<]*<\/title>/, `<title>${escaparHtml(titulo)}</title>`);
+// { titulo, descricao, imagem } da página: projeto, plano de aula ou tópico do fórum
+function paginaComPrevia(html, { titulo, descricao, imagem }, enderecoDaPagina) {
+  let pagina = html.replace(/<title>[^<]*<\/title>/, `<title>${escaparHtml(`${titulo} — Ensine Música`)}</title>`);
   pagina = trocarMeta(pagina, "name", "description", descricao);
   pagina = trocarMeta(pagina, "property", "og:type", "article");
-  pagina = trocarMeta(pagina, "property", "og:title", projeto.titulo);
+  pagina = trocarMeta(pagina, "property", "og:title", titulo);
   pagina = trocarMeta(pagina, "property", "og:description", descricao);
   pagina = trocarMeta(pagina, "property", "og:url", enderecoDaPagina);
-  pagina = trocarMeta(pagina, "property", "og:image:alt", projeto.titulo);
+  pagina = trocarMeta(pagina, "property", "og:image:alt", titulo);
   if (imagem) pagina = trocarMeta(pagina, "property", "og:image", imagem);
   return pagina.replace("</head>", `    <link rel="canonical" href="${escaparHtml(enderecoDaPagina)}" />\n  </head>`);
 }
 
-app.get("/projeto/:id", async (req, res) => {
+// Cada tipo de página: o caminho no site e como achar o título, a descrição e a foto
+const PAGINAS_COM_PREVIA = {
+  projeto: async (id) => {
+    const projeto = await Projeto.findById(id).lean();
+    return (
+      projeto && {
+        titulo: projeto.titulo,
+        descricao: resumir(projeto.descricaoGeral) || "Projeto de educação musical com materiais alternativos.",
+        imagem: imagemDePrevia(projeto.imagem),
+      }
+    );
+  },
+  plano: async (id) => {
+    const plano = await Plano.findById(id).populate("projetos", "imagem").lean();
+    return (
+      plano && {
+        titulo: plano.titulo,
+        descricao: resumir(plano.resumo) || "Plano de aula de música do Ensine Música.",
+        imagem: imagemDePrevia(plano.projetos?.find((p) => p?.imagem)?.imagem),
+      }
+    );
+  },
+  forum: async (id) => {
+    const topico = await Topico.findOne({ _id: id, status: "aprovado" }).lean();
+    return topico && { titulo: topico.titulo, descricao: resumir(topico.texto) || "Conversa no fórum do Ensine Música." };
+  },
+};
+
+app.get(["/projeto/:id", "/plano/:id", "/forum/:id"], async (req, res) => {
+  const tipo = req.path.split("/")[1];
   let html;
   try {
     html = await lerHtmlBase(req);
@@ -795,11 +868,11 @@ app.get("/projeto/:id", async (req, res) => {
 
   if (!/^[0-9a-f]{24}$/i.test(req.params.id)) return res.status(404).send(html);
   try {
-    const projeto = await Projeto.findById(req.params.id).lean();
-    if (!projeto) return res.status(404).send(html);
-    res.send(paginaComPrevia(html, projeto, `${origemDoSite(req)}/projeto/${projeto._id}`));
+    const previa = await PAGINAS_COM_PREVIA[tipo](req.params.id);
+    if (!previa) return res.status(404).send(html);
+    res.send(paginaComPrevia(html, previa, `${origemDoSite(req)}/${tipo}/${req.params.id}`));
   } catch (error) {
-    console.error("Erro ao montar a prévia do projeto:", error);
+    console.error("Erro ao montar a prévia da página:", error);
     res.send(html); // sem a prévia, mas a página funciona normalmente
   }
 });
@@ -814,6 +887,9 @@ app.get("/robots.txt", (req, res) => {
       "Disallow: /login",
       "Disallow: /adicionar-projeto",
       "Disallow: /editar-projeto/",
+      "Disallow: /novo-plano",
+      "Disallow: /editar-plano/",
+      "Disallow: /moderacao",
       "Disallow: /backup",
       "Disallow: /contas",
       "Disallow: /minha-conta",
@@ -833,14 +909,21 @@ const dataISO = (dataBR) => {
 app.get("/sitemap.xml", async (req, res) => {
   try {
     const origem = origemDoSite(req);
-    const projetos = await Projeto.find({}, { _id: 1, data: 1 }).lean();
+    const [projetos, planos, topicos] = await Promise.all([
+      Projeto.find({}, { _id: 1, data: 1 }).lean(),
+      Plano.find({}, { _id: 1, updatedAt: 1 }).lean(),
+      Topico.find({ status: "aprovado" }, { _id: 1, ultimaAtividade: 1 }).lean(),
+    ]);
+    const url = (caminho, data) => `<url><loc>${origem}${caminho}</loc>${data ? `<lastmod>${data}</lastmod>` : ""}</url>`;
+    const dia = (data) => (data ? new Date(data).toISOString().slice(0, 10) : null);
     const urls = [
-      `<url><loc>${origem}/</loc></url>`,
-      `<url><loc>${origem}/Ensine-Musica</loc></url>`,
-      ...projetos.map((p) => {
-        const data = dataISO(p.data);
-        return `<url><loc>${origem}/projeto/${p._id}</loc>${data ? `<lastmod>${data}</lastmod>` : ""}</url>`;
-      }),
+      url("/"),
+      url("/planos"),
+      url("/forum"),
+      url("/Ensine-Musica"),
+      ...projetos.map((p) => url(`/projeto/${p._id}`, dataISO(p.data))),
+      ...planos.map((p) => url(`/plano/${p._id}`, dia(p.updatedAt))),
+      ...topicos.map((t) => url(`/forum/${t._id}`, dia(t.ultimaAtividade))),
     ];
     res.type("application/xml");
     res.setHeader("Cache-Control", "public, max-age=0, s-maxage=3600");

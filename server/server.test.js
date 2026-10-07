@@ -268,3 +268,87 @@ test("login bloqueia após 5 senhas erradas, mesmo com a senha certa", async () 
   assert.equal((await login("errada")).status, 429);
   assert.equal((await login(SENHA)).status, 429);
 });
+
+// **Planos de aula, comentários e fórum** (só o que é conferido antes de chegar ao banco)
+const enviarJson = (metodo, caminho, corpo, cabecalhos = {}) =>
+  fetch(`${base}${caminho}`, {
+    method: metodo,
+    headers: { "Content-Type": "application/json", ...cabecalhos },
+    body: JSON.stringify(corpo),
+  });
+
+test("planos, moderação e remoções exigem login", async () => {
+  const id = "6ac53dc9b97f33c7c5f9597f";
+  const pedidos = [
+    ["POST", "/planos"],
+    ["PUT", `/planos/${id}`],
+    ["DELETE", `/planos/${id}`],
+    ["GET", "/moderacao"],
+    ["GET", "/moderacao/contagem"],
+    ["POST", `/moderacao/comentarios/${id}/aprovar`],
+    ["POST", `/moderacao/topicos/${id}/aprovar`],
+    ["DELETE", `/comentarios/${id}`],
+    ["DELETE", `/forum/${id}`],
+  ];
+  for (const [metodo, caminho] of pedidos) {
+    const resposta = await fetch(`${base}${caminho}`, { method: metodo });
+    assert.equal(resposta.status, 401, `${metodo} ${caminho}`);
+  }
+});
+
+test("plano de aula precisa de título e aceita no máximo 10 projetos relacionados", async () => {
+  const semTitulo = await enviarJson("POST", "/planos", { titulo: " " }, comToken());
+  assert.equal(semTitulo.status, 400);
+  const projetos = Array.from({ length: 11 }, (_, i) => `6ac53dc9b97f33c7c5f959${String(i).padStart(2, "0")}`);
+  const demais = await enviarJson("POST", "/planos", { titulo: "Pulsação", projetos }, comToken());
+  assert.equal(demais.status, 400);
+  const idInvalido = await enviarJson("POST", "/planos", { titulo: "Pulsação", projetos: ["abc"] }, comToken());
+  assert.equal(idInvalido.status, 400);
+  const duracao = await enviarJson("POST", "/planos", { titulo: "Pulsação", duracao: "10" }, comToken());
+  assert.equal(duracao.status, 400);
+});
+
+test("comentário de visitante precisa de nome e texto de tamanho razoável", async () => {
+  const alvo = { tipo: "projeto", alvo: "6ac53dc9b97f33c7c5f9597f" };
+  const casos = [
+    { ...alvo, nome: "A", texto: "Gostei muito!" },
+    { ...alvo, nome: "Ana", texto: "" },
+    { ...alvo, nome: "Ana", texto: "x".repeat(2001) },
+  ];
+  for (const corpo of casos) {
+    const resposta = await enviarJson("POST", "/comentarios", corpo);
+    assert.equal(resposta.status, 400, JSON.stringify(corpo).slice(0, 80));
+  }
+});
+
+test("listar comentários exige um alvo válido", async () => {
+  for (const consulta of ["", "?tipo=outro&alvo=6ac53dc9b97f33c7c5f9597f", "?tipo=projeto&alvo=abc"]) {
+    const resposta = await fetch(`${base}/comentarios${consulta}`);
+    assert.equal(resposta.status, 400, consulta);
+  }
+});
+
+test("robôs que preenchem o campo escondido recebem 'pendente' e nada é salvo", async () => {
+  const resposta = await enviarJson("POST", "/comentarios", {
+    tipo: "projeto",
+    alvo: "6ac53dc9b97f33c7c5f9597f",
+    nome: "Robô",
+    texto: "Compre agora!",
+    site: "http://spam.example",
+  });
+  assert.equal(resposta.status, 202);
+  assert.deepEqual(await resposta.json(), { status: "pendente" });
+});
+
+test("tópico do fórum precisa de título, texto e categoria conhecida", async () => {
+  const valido = { nome: "Ana", titulo: "Como afinar o violão de caixa?", texto: "Alguém tem uma dica de afinação?" };
+  const casos = [
+    { ...valido, categoria: "outra" },
+    { ...valido, categoria: "duvidas", titulo: "Oi" },
+    { ...valido, categoria: "duvidas", texto: "curto" },
+  ];
+  for (const corpo of casos) {
+    const resposta = await enviarJson("POST", "/forum", corpo);
+    assert.equal(resposta.status, 400, JSON.stringify(corpo));
+  }
+});

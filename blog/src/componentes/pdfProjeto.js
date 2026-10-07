@@ -2,7 +2,7 @@
 // Só descreve o documento: as fontes, as fotos e o download ficam em baixarPdf.js.
 // Os textos longos saem justificados; listas curtas, legendas e referências, alinhados à esquerda.
 
-import { DURACOES, FAIXAS_ETARIAS, NIVEIS, rotuloTipo } from "./tipos";
+import { DURACOES, FAIXAS_ETARIAS, NIVEIS, linhas, rotuloTipo } from "./tipos";
 
 // A4 em pontos e margens (esquerda, topo, direita, base)
 const PAGINA = { largura: 595.28, altura: 841.89 };
@@ -218,17 +218,85 @@ export function montarDocumento(projeto, { fotos = {}, endereco }) {
   // Referências não são justificadas: são citações com nomes, títulos e endereços
   if (projeto.referencias) secao("Referências", corrido(projeto.referencias, "referencias"));
 
-  const meta = [{ text: "Por " }, { text: projeto.autor || "Ensine Música", bold: true }];
-  if (projeto.data) meta.push({ text: `  ·  ${projeto.data}` });
+  return envolver({
+    titulo: projeto.titulo,
+    autor: projeto.autor,
+    data: projeto.data,
+    resumo: projeto.descricaoGeral,
+    rotulo: rotuloTipo(projeto.tipoProjeto),
+    cor: ehJogo ? COR.jogo : COR.destaque,
+    ficha: ficha(projeto),
+    capa: fotos.capa && { image: "capa", fit: [LARGURA_UTIL, 290], alignment: "center", margin: [0, 18, 0, 0] },
+    secoes,
+    fotos,
+    endereco,
+  });
+}
+
+// Plano de aula: objetivos, materiais e projetos, desenvolvimento, avaliação e dicas
+export function montarDocumentoPlano(plano, { endereco }) {
+  const secoes = [];
+  const secao = (titulo, conteudo) => secoes.push({ titulo, conteudo: conteudo.filter(Boolean) });
+  const objetivos = linhas(plano.objetivos);
+  const materiais = linhas(plano.materiais);
+  const etapas = linhas(plano.desenvolvimento);
+  const projetos = (plano.projetos || []).filter(Boolean);
+  const origem = endereco.replace(/\/plano\/.*$/, "");
+
+  if (objetivos.length > 0) {
+    secao("Objetivos", [
+      { ul: objetivos.map((o) => ({ text: o, alignment: "justify" })), markerColor: COR.destaque, margin: [0, 0, 0, 6] },
+    ]);
+  }
+  if (materiais.length > 0 || projetos.length > 0) {
+    secao("Materiais e projetos", [
+      materiais.length > 0 && listaMateriais(materiais),
+      projetos.length > 0 && subtitulo("Projetos usados nesta aula"),
+      projetos.length > 0 && {
+        ul: projetos.map((p) => ({
+          text: [
+            { text: p.titulo, bold: true },
+            "  ·  passo a passo em ",
+            { text: `${origem.replace(/^https?:\/\//, "")}/projeto/${p._id}`, link: `${origem}/projeto/${p._id}`, style: "link" },
+          ],
+        })),
+        markerColor: COR.destaque,
+        margin: [0, 0, 0, 6],
+      },
+    ]);
+  }
+  if (etapas.length > 0) secao("Desenvolvimento", [listaEtapas(etapas)]);
+  if (plano.avaliacao) secao("Avaliação", corrido(plano.avaliacao));
+  if (plano.dicas) secao("Dicas", corrido(plano.dicas));
+
+  return envolver({
+    titulo: plano.titulo,
+    autor: plano.autor || plano.publicadoPor,
+    data: plano.data,
+    resumo: plano.resumo,
+    rotulo: "Plano de aula",
+    cor: COR.destaque,
+    ficha: ficha({ faixasEtarias: plano.faixasEtarias, duracao: plano.duracao }),
+    abertura: plano.resumo ? corrido(plano.resumo, "abertura").map((p) => ({ ...p, margin: [0, 18, 0, 0] })) : [],
+    secoes,
+    endereco,
+  });
+}
+
+// Cabeçalho, rodapé, estilos e numeração das seções, iguais em todos os PDFs
+function envolver({ titulo, autor, data, resumo, rotulo, cor, ficha: quadroFicha, capa, abertura = [], secoes, fotos = {}, endereco }) {
+  const enderecoCurto = endereco.replace(/^https?:\/\//, "");
+  const meta = [{ text: "Por " }, { text: autor || "Ensine Música", bold: true }];
+  if (data) meta.push({ text: `  ·  ${data}` });
 
   return {
     pageSize: "A4",
     pageMargins: MARGENS,
     language: "pt-BR",
     info: {
-      title: projeto.titulo,
-      author: projeto.autor || "Ensine Música",
-      subject: projeto.descricaoGeral?.slice(0, 200),
+      title: titulo,
+      author: autor || "Ensine Música",
+      subject: resumo?.slice(0, 200),
       creator: "Ensine Música",
       producer: "Ensine Música",
     },
@@ -239,19 +307,20 @@ export function montarDocumento(projeto, { fotos = {}, endereco }) {
           { svg: LOGO, width: 16, height: 16 },
           { text: "ENSINE MÚSICA", style: "marca", width: "*", margin: [7, 4, 0, 0] },
           {
-            text: rotuloTipo(projeto.tipoProjeto).toUpperCase(),
+            text: rotulo.toUpperCase(),
             style: "marca",
-            color: ehJogo ? COR.jogo : COR.destaque,
+            color: cor,
             width: "auto",
             margin: [0, 4, 0, 0],
           },
         ],
         margin: [0, 0, 0, 22],
       },
-      { text: projeto.titulo, style: "titulo" },
+      { text: titulo, style: "titulo" },
       { text: meta, style: "meta" },
-      ficha(projeto),
-      fotos.capa && { image: "capa", fit: [LARGURA_UTIL, 290], alignment: "center", margin: [0, 18, 0, 0] },
+      quadroFicha,
+      capa,
+      ...abertura,
       ...secoes.flatMap(({ titulo, conteudo }, index) => [
         { text: "", margin: [0, index === 0 ? 22 : 16, 0, 0] },
         ...tituloSecao(ROMANOS[index], titulo),

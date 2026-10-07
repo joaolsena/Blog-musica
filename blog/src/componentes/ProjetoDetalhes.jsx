@@ -11,6 +11,8 @@ import { DURACOES, FAIXAS_ETARIAS, NIVEIS, rotuloTipo } from "./tipos";
 import { srcSetImagem, urlImagem } from "./imagens";
 import VideoProjeto from "./VideoProjeto";
 import { BotaoCompartilhar, ConviteCompartilhar } from "./Compartilhar";
+import BotaoBaixarPdf from "./BotaoBaixarPdf";
+import Comentarios from "./Comentarios";
 
 // Separa os campos de texto em que cada item é delimitado por ponto e vírgula
 const dividir = (texto) => (texto ? texto.split(";").map((item) => item.trim()).filter(Boolean) : []);
@@ -78,42 +80,6 @@ function Ficha({ projeto }) {
         </div>
       ))}
     </dl>
-  );
-}
-
-// Gera o PDF do projeto (com fotos, ficha e materiais para marcar) e baixa o arquivo.
-// O gerador só é carregado no primeiro toque, para não pesar a página.
-function BotaoBaixarPdf({ projeto }) {
-  const [gerando, setGerando] = useState(false);
-
-  const baixar = async () => {
-    setGerando(true);
-    try {
-      const { baixarPdf } = await import("./baixarPdf");
-      await baixarPdf(projeto, `${window.location.origin}/projeto/${projeto._id}`);
-    } catch (error) {
-      console.error("Erro ao gerar o PDF:", error);
-      toast.error("Não foi possível gerar o PDF agora. Verifique a conexão e tente de novo.");
-    } finally {
-      setGerando(false);
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      className="btn btn--ghost compartilhar__botao"
-      onClick={baixar}
-      disabled={gerando}
-      aria-busy={gerando}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
-        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z" />
-        <path d="M14 3.5v5h5M12 11.5v6M9.5 15l2.5 2.5 2.5-2.5" />
-      </svg>
-      {gerando ? "Gerando PDF…" : "Baixar PDF"}
-    </button>
   );
 }
 
@@ -288,7 +254,12 @@ function ProjetoDetalhes() {
           </p>
           <div className="artigo__botoes">
             <BotaoCompartilhar titulo={projeto.titulo} />
-            <BotaoBaixarPdf projeto={projeto} />
+            <BotaoBaixarPdf
+              gerar={async () => {
+                const { baixarPdf } = await import("./baixarPdf");
+                await baixarPdf(projeto, `${window.location.origin}/projeto/${projeto._id}`);
+              }}
+            />
           </div>
         </div>
         <Ficha projeto={projeto} />
@@ -479,6 +450,8 @@ function ProjetoDetalhes() {
           )}
 
           <ConviteCompartilhar titulo={projeto.titulo} />
+
+          <Comentarios tipo="projeto" alvo={id} />
 
           <div className="artigo__fim">
             <VoltarLink />

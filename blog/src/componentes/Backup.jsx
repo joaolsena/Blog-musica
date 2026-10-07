@@ -28,8 +28,14 @@ function Backup() {
       link.download = nome;
       link.click();
       setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-      const { total } = JSON.parse(await data.text());
-      toast.success(`Backup baixado: ${plural(total, "projeto", "projetos")}.`);
+      const conteudo = JSON.parse(await data.text());
+      const partes = [
+        plural(conteudo.total, "projeto", "projetos"),
+        conteudo.planos?.length > 0 && plural(conteudo.planos.length, "plano de aula", "planos de aula"),
+        conteudo.topicos?.length > 0 && plural(conteudo.topicos.length, "tópico do fórum", "tópicos do fórum"),
+        conteudo.comentarios?.length > 0 && plural(conteudo.comentarios.length, "comentário", "comentários"),
+      ].filter(Boolean);
+      toast.success(`Backup baixado: ${partes.join(", ")}.`);
     } catch (error) {
       console.error("Erro ao baixar backup:", error);
       toast.error("Não foi possível gerar o backup agora. Tente de novo.");
@@ -63,11 +69,16 @@ function Backup() {
 
     setRestaurando(true);
     try {
-      const { data } = await axios.post("/backup/restaurar", { projetos });
+      // Backups novos também trazem planos de aula, tópicos do fórum e comentários
+      const { planos, topicos, comentarios } = Array.isArray(conteudo) ? {} : conteudo;
+      const { data } = await axios.post("/backup/restaurar", { projetos, planos, topicos, comentarios });
       const partes = [
         `${plural(data.restaurados, "projeto restaurado", "projetos restaurados")}`,
         data.jaExistiam > 0 && `${data.jaExistiam} já ${data.jaExistiam === 1 ? "existia" : "existiam"}`,
         data.ignorados > 0 && `${data.ignorados} ${data.ignorados === 1 ? "inválido ignorado" : "inválidos ignorados"}`,
+        data.outros?.planos > 0 && plural(data.outros.planos, "plano de aula restaurado", "planos de aula restaurados"),
+        data.outros?.topicos > 0 && plural(data.outros.topicos, "tópico restaurado", "tópicos restaurados"),
+        data.outros?.comentarios > 0 && plural(data.outros.comentarios, "comentário restaurado", "comentários restaurados"),
       ].filter(Boolean);
       toast.success(partes.join(" · "));
     } catch (error) {
@@ -85,7 +96,8 @@ function Backup() {
         <p className="eyebrow">Área do professor</p>
         <h1>Backup</h1>
         <p>
-          Uma cópia de todos os projetos, para nada se perder se o banco de dados for apagado por engano.
+          Uma cópia de todos os projetos, planos de aula, tópicos do fórum e comentários, para nada se perder se o banco
+          de dados for apagado por engano.
         </p>
       </header>
 
@@ -96,8 +108,8 @@ function Backup() {
             <h2>Baixar agora</h2>
           </div>
           <p className="backup__texto">
-            Gera um arquivo com os textos de todos os projetos e os endereços das fotos e vídeos. Guarde no
-            computador ou no Google Drive.
+            Gera um arquivo com os textos de todos os projetos e os endereços das fotos e vídeos, os planos de aula,
+            o fórum e os comentários. Guarde no computador ou no Google Drive.
           </p>
           <div>
             <button type="button" className="btn btn--primary" onClick={baixar} disabled={baixando}>
@@ -112,8 +124,8 @@ function Backup() {
             <h2>Backup automático</h2>
           </div>
           <p className="backup__texto">
-            Toda segunda-feira, às 6h, o GitHub guarda sozinho uma cópia datada dos projetos. Se algo der errado, o
-            GitHub avisa por e-mail.
+            Toda segunda-feira, às 6h, o GitHub guarda sozinho uma cópia datada dos projetos e dos planos de aula (o
+            fórum e os comentários ficam só no backup baixado aqui). Se algo der errado, o GitHub avisa por e-mail.
           </p>
           <div>
             <a className="btn btn--ghost" href={BACKUPS_NO_GITHUB} target="_blank" rel="noreferrer">

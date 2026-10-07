@@ -30,3 +30,16 @@ export function resumoDaFicha(projeto) {
   const faixas = FAIXAS_ETARIAS.filter((f) => projeto.faixasEtarias?.includes(f.valor)).map((f) => f.curto);
   return [...faixas, rotuloDe(NIVEIS, projeto.nivel), rotuloDe(DURACOES, projeto.duracao)].filter(Boolean);
 }
+
+// Categorias do fórum. Os valores devem bater com o servidor (comunidade.js).
+export const CATEGORIAS_FORUM = [
+  { valor: "duvidas", rotulo: "Dúvidas", descricao: "Perguntas sobre os projetos e a prática" },
+  { valor: "ideias", rotulo: "Ideias e adaptações", descricao: "Variações e novos usos dos projetos" },
+  { valor: "relatos", rotulo: "Relatos de sala de aula", descricao: "Como foi aplicar com a turma" },
+  { valor: "materiais", rotulo: "Materiais", descricao: "Onde encontrar e o que usar no lugar" },
+];
+
+export const rotuloCategoria = (valor) => rotuloDe(CATEGORIAS_FORUM, valor) || "Fórum";
+
+// Listas dos planos de aula: um item por linha
+export const linhas = (texto) => (texto ? texto.split("\n").map((linha) => linha.trim()).filter(Boolean) : []);
