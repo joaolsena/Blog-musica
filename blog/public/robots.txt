@@ -1,8 +1,0 @@
-# https://www.robotstxt.org/robotstxt.html
-User-agent: *
-Disallow: /login
-Disallow: /adicionar-projeto
-Disallow: /editar-projeto/
-Disallow: /backup
-
-Sitemap: https://ensine-musica.vercel.app/sitemap.xml
