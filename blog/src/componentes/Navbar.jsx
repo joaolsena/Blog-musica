@@ -3,12 +3,49 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import Logo from "./Logo";
 import { BotaoInstalar } from "./InstalarApp";
-import MenuConta from "./MenuConta";
+import MenuConta, { ROTULO_PAPEL, iniciais } from "./MenuConta";
 import { BotaoTema } from "./Tema";
 import { atualizarContagem, useContagemModeracao, zerarContagem } from "./contagemModeracao";
 
+// Ícones dos links no menu do celular
+const ICONES = {
+  projetos: (
+    <>
+      <path d="M9 18V5.5l11-2V16" />
+      <circle cx="6.5" cy="18" r="2.5" />
+      <circle cx="17.5" cy="16" r="2.5" />
+    </>
+  ),
+  planos: (
+    <>
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 4V3h6v1M8.5 10h7M8.5 14h7M8.5 18h4" />
+    </>
+  ),
+  forum: (
+    <>
+      <path d="M20 12.5a7.5 7.5 0 0 1-11 6.6L4 20l1-4.3A7.5 7.5 0 1 1 20 12.5z" />
+    </>
+  ),
+  sobre: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5.5M12 7.8v.2" />
+    </>
+  ),
+};
+
+function IconeMenu({ nome }) {
+  return (
+    <svg className="menu-painel__icone" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {ICONES[nome]}
+    </svg>
+  );
+}
+
 function Navbar() {
-  const { isAuthenticated, ehAdmin, logout } = useAuth();
+  const { isAuthenticated, ehAdmin, logout, usuario } = useAuth();
   const pendentes = useContagemModeracao();
   const [menuAberto, setMenuAberto] = useState(false);
   const [rolou, setRolou] = useState(false);
@@ -33,23 +70,19 @@ function Navbar() {
     return () => window.removeEventListener("scroll", aoRolar);
   }, []);
 
-  // Com o menu aberto no celular: trava a rolagem da página e fecha com Esc
+  // Com o menu aberto no celular: fecha com Esc
   useEffect(() => {
     if (!menuAberto) return undefined;
     const aoTeclar = (e) => e.key === "Escape" && setMenuAberto(false);
-    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", aoTeclar);
-    return () => {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", aoTeclar);
-    };
+    return () => window.removeEventListener("keydown", aoTeclar);
   }, [menuAberto]);
 
   const links = [
-    { to: "/", rotulo: "Projetos", end: true },
-    { to: "/planos", rotulo: "Planos de aula" },
-    { to: "/forum", rotulo: "Fórum" },
-    { to: "/Ensine-Musica", rotulo: "Sobre" },
+    { to: "/", rotulo: "Projetos", end: true, icone: "projetos" },
+    { to: "/planos", rotulo: "Planos de aula", icone: "planos" },
+    { to: "/forum", rotulo: "Fórum", icone: "forum" },
+    { to: "/Ensine-Musica", rotulo: "Sobre", icone: "sobre" },
   ];
 
   return (
@@ -127,35 +160,53 @@ function Navbar() {
         </div>
       </header>
 
-      {/* Menu do celular. Fica fora do <header> porque o backdrop-filter do cabeçalho
-          faria o position: fixed se posicionar dentro dele, cortando o menu. */}
+      {/* Menu do celular: um painel que abre a partir do botão, sem cobrir a tela toda.
+          Fica fora do <header> porque o backdrop-filter do cabeçalho faria o position: fixed
+          se posicionar dentro dele. */}
       <div
+        className={`menu-painel__fundo${menuAberto ? " is-open" : ""}`}
+        onClick={() => setMenuAberto(false)}
+        aria-hidden="true"
+      />
+      <nav
         id="menu-mobile"
-        className={`mobile-menu${menuAberto ? " is-open" : ""}`}
+        className={`menu-painel${menuAberto ? " is-open" : ""}`}
+        aria-label="Menu"
         aria-hidden={!menuAberto}
         inert={menuAberto ? undefined : ""}
       >
-        <ul>
-          {links.map((link, index) => (
-            <li key={link.to} style={{ "--i": index }}>
-              <NavLink
-                to={link.to}
-                end={link.end}
-                className="mobile-menu__link"
-              >
+        <ul className="menu-painel__lista">
+          {links.map((link) => (
+            <li key={link.to}>
+              <NavLink to={link.to} end={link.end} className="menu-painel__link">
+                <IconeMenu nome={link.icone} />
                 {link.rotulo}
               </NavLink>
             </li>
           ))}
-          {isAuthenticated ? (
-            <>
-              <li style={{ "--i": links.length }}>
-                <NavLink to="/adicionar-projeto" className="mobile-menu__link">
-                  Novo projeto
-                </NavLink>
-              </li>
+        </ul>
+
+        {isAuthenticated ? (
+          <div className="menu-painel__conta">
+            <div className="menu-painel__quem">
+              <span className="conta__avatar" aria-hidden="true">
+                {iniciais(usuario?.nome)}
+              </span>
+              <span>
+                <strong>{usuario?.nome}</strong>
+                {usuario?.nome !== ROTULO_PAPEL[usuario?.papel] && <span>{ROTULO_PAPEL[usuario?.papel]}</span>}
+              </span>
+            </div>
+            <div className="menu-painel__criar">
+              <Link to="/adicionar-projeto" className="btn btn--primary btn--sm">
+                + Projeto
+              </Link>
+              <Link to="/novo-plano" className="btn btn--ghost btn--sm">
+                + Plano de aula
+              </Link>
+            </div>
+            <ul className="menu-painel__lista menu-painel__lista--conta">
               {[
-                { to: "/novo-plano", rotulo: "Novo plano de aula" },
                 { to: "/moderacao", rotulo: "Moderação", contagem: pendentes },
                 { to: "/minha-conta", rotulo: "Minha conta" },
                 ...(ehAdmin
@@ -164,9 +215,9 @@ function Navbar() {
                       { to: "/backup", rotulo: "Backup" },
                     ]
                   : []),
-              ].map((link, index) => (
-                <li key={link.to} style={{ "--i": links.length + 1 + index }}>
-                  <NavLink to={link.to} className="mobile-menu__link">
+              ].map((link) => (
+                <li key={link.to}>
+                  <NavLink to={link.to} className="menu-painel__link menu-painel__link--conta">
                     {link.rotulo}
                     {link.contagem > 0 && (
                       <span className="contagem-pendentes" aria-label={`${link.contagem} esperando aprovação`}>
@@ -176,25 +227,21 @@ function Navbar() {
                   </NavLink>
                 </li>
               ))}
-              <li style={{ "--i": links.length + (ehAdmin ? 6 : 4) }}>
-                <button
-                  type="button"
-                  className="mobile-menu__link"
-                  onClick={logout}
-                >
+              <li>
+                <button type="button" className="menu-painel__link menu-painel__link--conta menu-painel__sair" onClick={logout}>
                   Sair
                 </button>
               </li>
-            </>
-          ) : (
-            <li style={{ "--i": links.length }}>
-              <NavLink to="/login" className="mobile-menu__link">
-                Entrar
-              </NavLink>
-            </li>
-          )}
-        </ul>
-      </div>
+            </ul>
+          </div>
+        ) : (
+          <div className="menu-painel__conta">
+            <NavLink to="/login" className="menu-painel__link menu-painel__link--conta">
+              Entrar como professor
+            </NavLink>
+          </div>
+        )}
+      </nav>
     </>
   );
 }
