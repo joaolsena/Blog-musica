@@ -18,7 +18,6 @@ import { apagarRascunho, lerRascunho, salvarRascunho } from "./rascunho";
 
 const projetoVazio = {
   titulo: "",
-  nomeMaterial: "",
   descricaoGeral: "",
   materiais: "",
   passoAPasso: "",
@@ -40,6 +39,7 @@ function AdicionarProjeto() {
   const [novoProjeto, setNovoProjeto] = useState(projetoVazio);
   const [imagemPrincipal, setImagemPrincipal] = useState([]); // no máximo um arquivo
   const [imagensPasso, setImagensPasso] = useState([]); // arquivos do passo a passo
+  const [legendas, setLegendas] = useState([]); // legenda de cada arquivo do passo a passo
   const [videos, setVideos] = useState([]); // links do YouTube e arquivos de vídeo (ver CampoVideos)
   const [enviando, setEnviando] = useState(false);
   const enviandoRef = useRef(false);
@@ -54,6 +54,7 @@ function AdicionarProjeto() {
     setNovoProjeto(projetoVazio);
     setImagemPrincipal([]);
     setImagensPasso([]);
+    setLegendas([]);
     setVideos([]);
     setRascunhoSalvoEm(null);
   }, []);
@@ -66,6 +67,7 @@ function AdicionarProjeto() {
         setNovoProjeto({ ...projetoVazio, ...rascunho.campos });
         setImagemPrincipal(rascunho.imagemPrincipal || []);
         setImagensPasso(rascunho.imagensPasso || []);
+        setLegendas(rascunho.legendas || []);
         setVideos(rascunho.videos || []);
         setRascunhoSalvoEm(rascunho.salvoEm);
         toast("Rascunho recuperado", {
@@ -88,15 +90,16 @@ function AdicionarProjeto() {
       ) ||
       imagemPrincipal.length > 0 ||
       imagensPasso.length > 0 ||
+      legendas.some(Boolean) ||
       videos.length > 0;
     if (!temConteudo) return undefined;
     // Espera a pessoa parar de digitar por um instante antes de salvar
     const temporizador = setTimeout(async () => {
-      const salvoEm = await salvarRascunho({ campos: novoProjeto, imagemPrincipal, imagensPasso, videos });
+      const salvoEm = await salvarRascunho({ campos: novoProjeto, imagemPrincipal, imagensPasso, legendas, videos });
       if (salvoEm && !enviandoRef.current) setRascunhoSalvoEm(salvoEm);
     }, 600);
     return () => clearTimeout(temporizador);
-  }, [rascunhoCarregado, novoProjeto, imagemPrincipal, imagensPasso, videos]);
+  }, [rascunhoCarregado, novoProjeto, imagemPrincipal, imagensPasso, legendas, videos]);
 
   const atualizar = (e) => {
     const { name, value } = e.target;
@@ -133,6 +136,7 @@ function AdicionarProjeto() {
         ...novoProjeto,
         imagem: midias.urlPrincipal || novoProjeto.imagem,
         imagensPassoAPasso: midias.urlsPassos,
+        legendasPassoAPasso: midias.urlsPassos.map((_, i) => legendas[i] || ""),
         videos: urlsFinais(videos, midias.urlsVideos),
       });
 
@@ -155,14 +159,17 @@ function AdicionarProjeto() {
       toast.error(`Selecione no máximo ${LIMITE_IMAGENS_PASSO} imagens do passo a passo.`);
       e.target.value = "";
       setImagensPasso([]);
+      setLegendas([]);
       return;
     }
     if (!tamanhosValidos(arquivos)) {
       e.target.value = "";
       setImagensPasso([]);
+      setLegendas([]);
       return;
     }
     setImagensPasso(arquivos);
+    setLegendas(arquivos.map(() => ""));
   };
 
   const ehInstrumento = novoProjeto.tipoProjeto === "instrumento";
@@ -241,6 +248,10 @@ function AdicionarProjeto() {
               accept={FORMATOS_ACEITOS}
               multiplo
               onChange={handleImagensPasso}
+              legendas={legendas}
+              onLegenda={(indice, texto) =>
+                setLegendas((atuais) => imagensPasso.map((_, i) => (i === indice ? texto : atuais[i] || "")))
+              }
             />
           </div>
         </section>

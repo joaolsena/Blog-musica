@@ -52,6 +52,12 @@ function VoltarLink() {
   );
 }
 
+// "Passo 2 — Interior da caixa" (ou só "Passo 2 da construção", sem legenda)
+const legendaDaFoto = (projeto, index) => {
+  const legenda = projeto.legendasPassoAPasso?.[index];
+  return legenda ? `Passo ${index + 1} — ${legenda}` : `Passo ${index + 1} da construção`;
+};
+
 // Ficha do projeto: para quem é, nível e duração (só o que foi informado)
 function Ficha({ projeto }) {
   const faixas = FAIXAS_ETARIAS.filter((f) => projeto.faixasEtarias?.includes(f.valor)).map((f) => f.curto);
@@ -99,7 +105,7 @@ function ProjetoDetalhes() {
   const [erro, setErro] = useState(null); // Estado para mensagens de erro
   const [excluindo, setExcluindo] = useState(false);
   const [lightbox, setLightbox] = useState(null); // índice da imagem aberta
-  const { isAuthenticated } = useAuth(); // Verifica se o usuário está logado
+  const { isAuthenticated, podeEditar } = useAuth(); // Verifica se o usuário está logado
   const navigate = useNavigate(); // Navegação após exclusão
   const [salvoEm, setSalvoEm] = useState(salvo?.salvoEm);
   const sincronia = useSincronia();
@@ -235,7 +241,7 @@ function ProjetoDetalhes() {
   // Todas as imagens do projeto, na ordem em que aparecem, para o visualizador
   const imagens = [
     projeto.imagem && { src: projeto.imagem, legenda: projeto.titulo },
-    ...(projeto.imagensPassoAPasso || []).map((src, index) => ({ src, legenda: `Passo ${index + 1} da construção` })),
+    ...(projeto.imagensPassoAPasso || []).map((src, index) => ({ src, legenda: legendaDaFoto(projeto, index) })),
   ].filter(Boolean);
   const deslocamentoPassos = projeto.imagem ? 1 : 0;
 
@@ -342,25 +348,30 @@ function ProjetoDetalhes() {
 
               {projeto.imagensPassoAPasso?.length > 0 && (
                 <div className="galeria">
-                  {projeto.imagensPassoAPasso.map((url, index) => (
-                    <button
-                      type="button"
-                      className="galeria__item"
-                      key={index}
-                      onClick={() => setLightbox(index + deslocamentoPassos)}
-                      aria-label={`Ampliar imagem do passo ${index + 1}`}
-                    >
-                      <img
-                        src={urlImagem(url, 600)}
-                        srcSet={srcSetImagem(url, [400, 600, 900])}
-                        sizes="(min-width: 1024px) 340px, 50vw"
-                        alt={`Passo ${index + 1} da construção`}
-                        loading="lazy"
-                        decoding="async"
-                      />
-                      <span className="galeria__label">Passo {index + 1}</span>
-                    </button>
-                  ))}
+                  {projeto.imagensPassoAPasso.map((url, index) => {
+                    const legenda = projeto.legendasPassoAPasso?.[index];
+                    return (
+                      <figure className="galeria__figura" key={index}>
+                        <button
+                          type="button"
+                          className="galeria__item"
+                          onClick={() => setLightbox(index + deslocamentoPassos)}
+                          aria-label={`Ampliar imagem do passo ${index + 1}`}
+                        >
+                          <img
+                            src={urlImagem(url, 600)}
+                            srcSet={srcSetImagem(url, [400, 600, 900])}
+                            sizes="(min-width: 1024px) 340px, 50vw"
+                            alt={legendaDaFoto(projeto, index)}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                          <span className="galeria__label">Passo {index + 1}</span>
+                        </button>
+                        {legenda && <figcaption className="galeria__legenda">{legenda}</figcaption>}
+                      </figure>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -432,7 +443,11 @@ function ProjetoDetalhes() {
             </section>
           )}
 
-          {isAuthenticated && (
+          {isAuthenticated && projeto.publicadoPor && (
+            <p className="artigo__publicado">Publicado no site por {projeto.publicadoPor}</p>
+          )}
+
+          {podeEditar(projeto) && (
             <div className="artigo__acoes">
               <Link to={`/editar-projeto/${id}`} className="btn btn--ghost">
                 Editar projeto

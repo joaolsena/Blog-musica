@@ -14,11 +14,13 @@ import {
 } from "./envioMidias";
 import CampoVideos, { urlsFinais, videosSalvos } from "./CampoVideos";
 import { esquecerProjeto } from "./memoria";
+import { useAuth } from "./AuthContext";
 
 // A rota já é protegida pelo PrivateRoute, então aqui o usuário está sempre autenticado
 function EditProjeto() {
   const { id } = useParams(); // Obtém o ID do projeto da URL
   const navigate = useNavigate();
+  const { podeEditar } = useAuth();
 
   const [projeto, setProjeto] = useState({
     titulo: "",
@@ -46,6 +48,8 @@ function EditProjeto() {
   const [passosAtuais, setPassosAtuais] = useState([]);
   const [novaPrincipal, setNovaPrincipal] = useState([]); // no máximo um arquivo
   const [novosPassos, setNovosPassos] = useState([]);
+  const [legendasAtuais, setLegendasAtuais] = useState([]); // legenda de cada imagem já salva
+  const [legendasNovas, setLegendasNovas] = useState([]); // legenda de cada arquivo novo
   const [videos, setVideos] = useState([]); // salvos, links novos e arquivos novos (ver CampoVideos)
   const vagasPasso = LIMITE_IMAGENS_PASSO - passosAtuais.length;
 
@@ -54,9 +58,16 @@ function EditProjeto() {
     const fetchProjeto = async () => {
       try {
         const { data } = await axios.get(`/projetos/${id}`);
+        // Autores só editam os próprios projetos (o servidor também confere)
+        if (!podeEditar(data)) {
+          toast.error("Você só pode editar os projetos que você publicou.");
+          navigate(`/projeto/${id}`, { replace: true });
+          return;
+        }
         setProjeto((prev) => ({ ...prev, ...data }));
         setImagemAtual(data.imagem || "");
         setPassosAtuais(data.imagensPassoAPasso || []);
+        setLegendasAtuais((data.imagensPassoAPasso || []).map((_, i) => data.legendasPassoAPasso?.[i] || ""));
         setVideos(videosSalvos(data.videos));
       } catch (error) {
         console.error("Erro ao carregar projeto:", error);
@@ -66,7 +77,7 @@ function EditProjeto() {
       }
     };
     fetchProjeto();
-  }, [id]);
+  }, [id, podeEditar, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -93,19 +104,27 @@ function EditProjeto() {
       );
       e.target.value = "";
       setNovosPassos([]);
+      setLegendasNovas([]);
       return;
     }
     if (!tamanhosValidos(arquivos)) {
       e.target.value = "";
       setNovosPassos([]);
+      setLegendasNovas([]);
       return;
     }
     setNovosPassos(arquivos);
+    setLegendasNovas(arquivos.map(() => ""));
   };
 
   const removerPasso = (indice) => {
     setPassosAtuais((atuais) => atuais.filter((_, i) => i !== indice));
+    setLegendasAtuais((atuais) => atuais.filter((_, i) => i !== indice));
   };
+
+  // Atualiza a legenda de uma posição, mantendo a lista do tamanho da lista de fotos
+  const trocarLegenda = (setLista, total) => (indice, texto) =>
+    setLista((atuais) => Array.from({ length: total }, (_, i) => (i === indice ? texto : atuais[i] || "")));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -135,6 +154,7 @@ function EditProjeto() {
         ...projeto,
         imagem: midias.urlPrincipal || imagemAtual,
         imagensPassoAPasso: [...passosAtuais, ...midias.urlsPassos],
+        legendasPassoAPasso: [...legendasAtuais, ...midias.urlsPassos.map((_, i) => legendasNovas[i] || "")],
         videos: urlsFinais(videos, midias.urlsVideos),
       });
       toast.success("Alterações salvas.", { id: aviso });
@@ -299,7 +319,13 @@ function EditProjeto() {
               accept={FORMATOS_ACEITOS}
               onChange={handleNovaPrincipal}
             />
-            <ImagensAtuais rotulo="Imagens do passo a passo" urls={passosAtuais} onRemover={removerPasso} />
+            <ImagensAtuais
+              rotulo="Imagens do passo a passo"
+              urls={passosAtuais}
+              onRemover={removerPasso}
+              legendas={legendasAtuais}
+              onLegenda={trocarLegenda(setLegendasAtuais, passosAtuais.length)}
+            />
             {vagasPasso > 0 ? (
               <EnvioImagens
                 id="edit-imagensPasso"
@@ -309,6 +335,8 @@ function EditProjeto() {
                 accept={FORMATOS_ACEITOS}
                 multiplo
                 onChange={handleNovosPassos}
+                legendas={legendasNovas}
+                onLegenda={trocarLegenda(setLegendasNovas, novosPassos.length)}
               />
             ) : (
               <p className="field__hint">

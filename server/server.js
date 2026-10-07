@@ -54,43 +54,97 @@ const iguais = (a, b) => {
   return crypto.timingSafeEqual(hashA, hashB);
 };
 
-const criarToken = () => {
+// O token guarda a conta (uid) de quem entrou. Sem uid é a conta principal, que entra
+// com ADMIN_PASSWORD (tokens antigos, de antes das contas, também caem aqui).
+const criarToken = (uid = null) => {
   const expiraEm = Date.now() + DURACAO_TOKEN_MS;
-  const dados = Buffer.from(JSON.stringify({ exp: expiraEm })).toString("base64url");
+  const dados = Buffer.from(JSON.stringify({ exp: expiraEm, uid })).toString("base64url");
   return { token: `${dados}.${assinar(dados)}`, expiraEm };
 };
 
-const tokenValido = (token) => {
-  if (!autenticacaoConfigurada || typeof token !== "string") return false;
+// Devolve o conteúdo do token ({ exp, uid }) ou null se for inválido ou vencido
+const lerToken = (token) => {
+  if (!autenticacaoConfigurada || typeof token !== "string") return null;
   const [dados, assinatura] = token.split(".");
-  if (!dados || !assinatura || !iguais(assinatura, assinar(dados))) return false;
+  if (!dados || !assinatura || !iguais(assinatura, assinar(dados))) return null;
   try {
-    const { exp } = JSON.parse(Buffer.from(dados, "base64url").toString());
-    return typeof exp === "number" && exp > Date.now();
+    const conteudo = JSON.parse(Buffer.from(dados, "base64url").toString());
+    return typeof conteudo.exp === "number" && conteudo.exp > Date.now() ? conteudo : null;
   } catch {
-    return false;
+    return null;
   }
 };
 
+const CONTA_PRINCIPAL = { id: null, nome: "Administrador", email: null, papel: "admin", principal: true };
+
 // Protege as rotas de escrita. Fica antes do multer, para que um envio sem
 // permissão seja recusado antes de qualquer imagem subir para o Cloudinary.
-const exigirAdmin = (req, res, next) => {
+// Coloca em req.usuario quem está fazendo o pedido. Uma conta desativada perde o
+// acesso na hora, mesmo com um token ainda válido.
+const exigirLogin = async (req, res, next) => {
   if (!autenticacaoConfigurada) {
     return res.status(503).send("Autenticação não configurada no servidor");
   }
-  const token = (req.get("Authorization") || "").replace(/^Bearer /, "");
-  if (!tokenValido(token)) {
+  const conteudo = lerToken((req.get("Authorization") || "").replace(/^Bearer /, ""));
+  if (!conteudo) {
     return res.status(401).send("Acesso não autorizado");
   }
-  next();
+  if (!conteudo.uid) {
+    req.usuario = CONTA_PRINCIPAL;
+    return next();
+  }
+  try {
+    const conta = await Usuario.findById(conteudo.uid).lean();
+    if (!conta || !conta.ativo) return res.status(401).send("Conta desativada ou removida");
+    req.usuario = { id: String(conta._id), nome: conta.nome, email: conta.email, papel: conta.papel };
+    next();
+  } catch (error) {
+    console.error("Erro ao conferir a conta:", error);
+    res.status(500).send("Erro ao conferir a conta");
+  }
 };
+
+// Só administradores (backup e gerenciamento de contas)
+const exigirAdmin = [
+  exigirLogin,
+  (req, res, next) =>
+    req.usuario.papel === "admin" ? next() : res.status(403).send("Só administradores podem fazer isso."),
+];
+
+// Administradores mexem em tudo; autores, só nos projetos que publicaram
+const podeMexerNoProjeto = (usuario, projeto) =>
+  usuario.papel === "admin" || (projeto.criadoPor && String(projeto.criadoPor) === usuario.id);
+
+// **Senhas das contas** (scrypt com sal aleatório; o servidor nunca guarda a senha em si)
+const gerarHashSenha = (senha) => {
+  const sal = crypto.randomBytes(16).toString("base64url");
+  return `scrypt$${sal}$${crypto.scryptSync(senha, sal, 64).toString("base64url")}`;
+};
+
+const senhaConfere = (senha, hashSalvo) => {
+  const [tipo, sal, hash] = String(hashSalvo || "").split("$");
+  if (tipo !== "scrypt" || !sal || !hash) return false;
+  const calculado = crypto.scryptSync(String(senha), sal, 64);
+  const esperado = Buffer.from(hash, "base64url");
+  return esperado.length === calculado.length && crypto.timingSafeEqual(esperado, calculado);
+};
+
+// Senha temporária fácil de ditar: sem letras e números que se confundem (0/O, 1/l)
+const gerarSenhaTemporaria = () => {
+  const letras = "abcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = crypto.randomBytes(10);
+  const texto = Array.from(bytes, (b) => letras[b % letras.length]).join("");
+  return `${texto.slice(0, 5)}-${texto.slice(5)}`;
+};
+
+const TAMANHO_MINIMO_SENHA = 8;
 
 // Limite de tentativas de login por IP: 5 erros a cada 15 minutos
 const LIMITE_TENTATIVAS = 5;
 const JANELA_TENTATIVAS_MS = 15 * 60 * 1000;
 const tentativasPorIp = new Map();
 
-api.post("/auth/login", (req, res) => {
+api.post("/auth/login", async (req, res) => {
   if (!autenticacaoConfigurada) {
     return res.status(503).send("Autenticação não configurada no servidor");
   }
@@ -103,15 +157,35 @@ api.post("/auth/login", (req, res) => {
   }
 
   const senha = req.body?.senha;
-  if (typeof senha === "string" && iguais(senha, ADMIN_PASSWORD)) {
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const errou = () => {
+    const atual = registro && registro.reiniciaEm > agora ? registro : { erros: 0, reiniciaEm: agora + JANELA_TENTATIVAS_MS };
+    atual.erros += 1;
+    tentativasPorIp.set(req.ip, atual);
+    res.status(401).send(email ? "E-mail ou senha incorretos" : "Senha incorreta");
+  };
+  if (typeof senha !== "string" || !senha) return errou();
+
+  // Sem e-mail: conta principal (senha ADMIN_PASSWORD)
+  if (!email) {
+    if (!iguais(senha, ADMIN_PASSWORD)) return errou();
     tentativasPorIp.delete(req.ip);
-    return res.json(criarToken());
+    return res.json({ ...criarToken(), usuario: CONTA_PRINCIPAL });
   }
 
-  const atual = registro && registro.reiniciaEm > agora ? registro : { erros: 0, reiniciaEm: agora + JANELA_TENTATIVAS_MS };
-  atual.erros += 1;
-  tentativasPorIp.set(req.ip, atual);
-  res.status(401).send("Senha incorreta");
+  // Com e-mail: conta individual
+  try {
+    const conta = await Usuario.findOne({ email }).lean();
+    if (!conta || !conta.ativo || !senhaConfere(senha, conta.senhaHash)) return errou();
+    tentativasPorIp.delete(req.ip);
+    res.json({
+      ...criarToken(String(conta._id)),
+      usuario: { id: String(conta._id), nome: conta.nome, email: conta.email, papel: conta.papel, trocarSenha: conta.trocarSenha },
+    });
+  } catch (error) {
+    console.error("Erro no login:", error);
+    res.status(500).send("Erro ao entrar");
+  }
 });
 
 // Limpa registros de tentativas vencidos, para o mapa não crescer para sempre
@@ -245,6 +319,8 @@ const videoPermitido = (url) =>
     (url.startsWith(`https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/`) &&
       extrairMidia(url)?.publicId.startsWith("videos/")));
 
+const LIMITE_LEGENDA = 160;
+
 // Confere as listas de mídia antes de salvar um projeto
 const validarMidias = (req, res, next) => {
   const { imagensPassoAPasso = [], videos = [] } = req.body;
@@ -259,6 +335,18 @@ const validarMidias = (req, res, next) => {
   }
   if (!videos.every(videoPermitido)) {
     return res.status(400).send("Vídeo inválido. Use um link do YouTube ou envie o arquivo do vídeo.");
+  }
+  // Legendas das fotos do passo a passo: uma por foto, na mesma ordem
+  const { legendasPassoAPasso } = req.body;
+  if (legendasPassoAPasso !== undefined) {
+    if (!Array.isArray(legendasPassoAPasso) || !legendasPassoAPasso.every((l) => typeof l === "string")) {
+      return res.status(400).send("Legendas inválidas.");
+    }
+    if (legendasPassoAPasso.some((l) => l.length > LIMITE_LEGENDA)) {
+      return res.status(400).send(`Cada legenda pode ter até ${LIMITE_LEGENDA} caracteres.`);
+    }
+    // Mesmo tamanho da lista de fotos (sobra é cortada, falta vira legenda vazia)
+    req.body.legendasPassoAPasso = imagensPassoAPasso.map((_, i) => (legendasPassoAPasso[i] || "").trim());
   }
   next();
 };
@@ -298,14 +386,51 @@ const Projeto = mongoose.model("Projeto", {
   autor: String,
   imagem: String, // URL da imagem principal
   imagensPassoAPasso: [String], // URLs das imagens do passo a passo
+  legendasPassoAPasso: [String], // legenda de cada imagem do passo a passo (mesma ordem)
   videos: [String], // links do YouTube ou URLs de vídeos no Cloudinary
   referencias: String,
   tipoProjeto: { type: String, default: "instrumento" }, // "instrumento" ou "jogo"
+  criadoPor: mongoose.Schema.Types.ObjectId, // conta que publicou (vazio: conta principal)
+  publicadoPor: String, // nome de quem publicou
   faixasEtarias: [String], // FAIXAS_ETARIAS
   nivel: String, // NIVEIS
   duracao: String, // DURACOES (em aulas)
   data: String,
 });
+
+// Contas individuais de professores e alunos
+const Usuario = mongoose.model(
+  "Usuario",
+  new mongoose.Schema(
+    {
+      nome: { type: String, required: true, trim: true },
+      email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+      senhaHash: { type: String, required: true },
+      papel: { type: String, enum: ["admin", "autor"], default: "autor" },
+      ativo: { type: Boolean, default: true },
+      trocarSenha: { type: Boolean, default: true }, // senha temporária: pede uma nova no primeiro acesso
+    },
+    { timestamps: true }
+  )
+);
+
+const contaPublica = (conta) => ({
+  id: String(conta._id),
+  nome: conta.nome,
+  email: conta.email,
+  papel: conta.papel,
+  ativo: conta.ativo,
+  trocarSenha: conta.trocarSenha,
+  criadaEm: conta.createdAt,
+});
+
+// Campos que só o servidor define (o formulário não pode trocar o dono do projeto)
+const limparCamposDoServidor = (req, res, next) => {
+  delete req.body._id;
+  delete req.body.criadoPor;
+  delete req.body.publicadoPor;
+  next();
+};
 
 // **Rotas**
 // Rota para obter todos os projetos
@@ -334,9 +459,14 @@ api.get("/projetos/:id", async (req, res) => {
 });
 
 // Rota para adicionar um novo projeto (as mídias já chegam como URLs)
-api.post("/adicionar", exigirAdmin, validarMidias, validarFicha, async (req, res) => {
+api.post("/adicionar", exigirLogin, limparCamposDoServidor, validarMidias, validarFicha, async (req, res) => {
   try {
-    const novoProjeto = new Projeto({ ...req.body, data: req.body.data || dataDeHoje() });
+    const novoProjeto = new Projeto({
+      ...req.body,
+      data: req.body.data || dataDeHoje(),
+      criadoPor: req.usuario.id,
+      publicadoPor: req.usuario.nome,
+    });
     await novoProjeto.save();
     res.status(201).json(novoProjeto);
   } catch (error) {
@@ -346,12 +476,15 @@ api.post("/adicionar", exigirAdmin, validarMidias, validarFicha, async (req, res
 });
 
 // Rota para editar um projeto existente
-api.put("/projetos/:id", exigirAdmin, validarMidias, validarFicha, async (req, res) => {
+api.put("/projetos/:id", exigirLogin, limparCamposDoServidor, validarMidias, validarFicha, async (req, res) => {
   try {
     const projetoAnterior = await Projeto.findById(req.params.id);
 
     if (!projetoAnterior) {
       return res.status(404).send("Projeto não encontrado para editar");
+    }
+    if (!podeMexerNoProjeto(req.usuario, projetoAnterior)) {
+      return res.status(403).send("Você só pode editar os projetos que você publicou.");
     }
 
     const projetoAtualizado = await Projeto.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -368,10 +501,17 @@ api.put("/projetos/:id", exigirAdmin, validarMidias, validarFicha, async (req, r
 });
 
 // Rota para excluir um projeto (e todas as suas imagens e vídeos)
-api.delete("/projetos/:id", exigirAdmin, async (req, res) => {
+api.delete("/projetos/:id", exigirLogin, async (req, res) => {
   try {
-    const projetoRemovido = await Projeto.findByIdAndDelete(req.params.id);
+    const projeto = await Projeto.findById(req.params.id);
+    if (!projeto) {
+      return res.status(404).send("Projeto não encontrado para excluir");
+    }
+    if (!podeMexerNoProjeto(req.usuario, projeto)) {
+      return res.status(403).send("Você só pode apagar os projetos que você publicou.");
+    }
 
+    const projetoRemovido = await Projeto.findByIdAndDelete(req.params.id);
     if (!projetoRemovido) {
       return res.status(404).send("Projeto não encontrado para excluir");
     }
@@ -386,7 +526,7 @@ api.delete("/projetos/:id", exigirAdmin, async (req, res) => {
 });
 
 // Rota para enviar uma imagem (principal ou do passo a passo), uma por requisição
-api.post("/upload", exigirAdmin, upload.single("imagem"), subirParaCloudinary, (req, res) => {
+api.post("/upload", exigirLogin, upload.single("imagem"), subirParaCloudinary, (req, res) => {
   if (!req.file) {
     return res.status(400).send("Nenhuma imagem foi enviada.");
   }
@@ -394,7 +534,7 @@ api.post("/upload", exigirAdmin, upload.single("imagem"), subirParaCloudinary, (
 });
 
 // Rota que autoriza o navegador a enviar um vídeo direto ao Cloudinary
-api.post("/videos/assinatura", exigirAdmin, (req, res) => {
+api.post("/videos/assinatura", exigirLogin, (req, res) => {
   const parametros = {
     timestamp: Math.round(Date.now() / 1000),
     folder: "videos",
@@ -410,7 +550,7 @@ api.post("/videos/assinatura", exigirAdmin, (req, res) => {
 });
 
 // Rota para remover mídias enviadas cujo projeto não chegou a ser salvo
-api.post("/midias/remover", exigirAdmin, async (req, res) => {
+api.post("/midias/remover", exigirLogin, async (req, res) => {
   try {
     const urls = Array.isArray(req.body.urls) ? req.body.urls.filter((url) => typeof url === "string") : [];
 
@@ -426,6 +566,110 @@ api.post("/midias/remover", exigirAdmin, async (req, res) => {
   } catch (error) {
     console.error("Erro ao remover mídias:", error);
     res.status(500).send("Erro ao remover mídias");
+  }
+});
+
+// **Contas**
+// Quem está logado (dados atualizados do banco)
+api.get("/auth/eu", exigirLogin, async (req, res) => {
+  if (req.usuario.principal) return res.json(CONTA_PRINCIPAL);
+  const conta = await Usuario.findById(req.usuario.id).lean();
+  res.json(contaPublica(conta));
+});
+
+// Trocar a própria senha (a conta principal troca a ADMIN_PASSWORD no Vercel)
+api.post("/auth/senha", exigirLogin, async (req, res) => {
+  if (req.usuario.principal) {
+    return res.status(400).send("A senha principal é trocada nas configurações do servidor (ADMIN_PASSWORD).");
+  }
+  const { senhaAtual, novaSenha } = req.body || {};
+  if (typeof novaSenha !== "string" || novaSenha.length < TAMANHO_MINIMO_SENHA) {
+    return res.status(400).send(`A nova senha precisa ter pelo menos ${TAMANHO_MINIMO_SENHA} caracteres.`);
+  }
+  try {
+    const conta = await Usuario.findById(req.usuario.id);
+    if (!senhaConfere(senhaAtual, conta.senhaHash)) return res.status(400).send("A senha atual está incorreta.");
+    conta.senhaHash = gerarHashSenha(novaSenha);
+    conta.trocarSenha = false;
+    await conta.save();
+    res.json(contaPublica(conta));
+  } catch (error) {
+    console.error("Erro ao trocar senha:", error);
+    res.status(500).send("Erro ao trocar a senha");
+  }
+});
+
+const ID_VALIDO = /^[0-9a-f]{24}$/i;
+const PAPEIS = ["admin", "autor"];
+
+api.get("/usuarios", exigirAdmin, async (req, res) => {
+  try {
+    const contas = await Usuario.find().sort({ nome: 1 }).lean();
+    res.json(contas.map(contaPublica));
+  } catch (error) {
+    console.error("Erro ao listar contas:", error);
+    res.status(500).send("Erro ao listar contas");
+  }
+});
+
+// Cria uma conta e devolve uma senha temporária (mostrada uma única vez)
+api.post("/usuarios", exigirAdmin, async (req, res) => {
+  const nome = typeof req.body?.nome === "string" ? req.body.nome.trim() : "";
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const papel = req.body?.papel || "autor";
+  if (!nome) return res.status(400).send("Informe o nome.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).send("Informe um e-mail válido.");
+  if (!PAPEIS.includes(papel)) return res.status(400).send("Papel inválido.");
+  try {
+    if (await Usuario.exists({ email })) return res.status(409).send("Já existe uma conta com esse e-mail.");
+    const senhaTemporaria = gerarSenhaTemporaria();
+    const conta = await Usuario.create({ nome, email, papel, senhaHash: gerarHashSenha(senhaTemporaria) });
+    res.status(201).json({ usuario: contaPublica(conta), senhaTemporaria });
+  } catch (error) {
+    console.error("Erro ao criar conta:", error);
+    res.status(500).send("Erro ao criar conta");
+  }
+});
+
+// Altera nome, papel ou ativa/desativa uma conta
+api.patch("/usuarios/:uid", exigirAdmin, async (req, res) => {
+  if (!ID_VALIDO.test(req.params.uid)) return res.status(404).send("Conta não encontrada");
+  const mudancas = {};
+  if (typeof req.body?.nome === "string" && req.body.nome.trim()) mudancas.nome = req.body.nome.trim();
+  if (req.body?.papel !== undefined) {
+    if (!PAPEIS.includes(req.body.papel)) return res.status(400).send("Papel inválido.");
+    mudancas.papel = req.body.papel;
+  }
+  if (typeof req.body?.ativo === "boolean") mudancas.ativo = req.body.ativo;
+  // Ninguém tira o próprio acesso de administrador por engano
+  if (req.params.uid === req.usuario.id && (mudancas.ativo === false || mudancas.papel === "autor")) {
+    return res.status(400).send("Você não pode desativar nem rebaixar a sua própria conta.");
+  }
+  try {
+    const conta = await Usuario.findByIdAndUpdate(req.params.uid, mudancas, { new: true }).lean();
+    if (!conta) return res.status(404).send("Conta não encontrada");
+    res.json(contaPublica(conta));
+  } catch (error) {
+    console.error("Erro ao alterar conta:", error);
+    res.status(500).send("Erro ao alterar conta");
+  }
+});
+
+// Gera uma nova senha temporária (para quem esqueceu a sua)
+api.post("/usuarios/:uid/nova-senha", exigirAdmin, async (req, res) => {
+  if (!ID_VALIDO.test(req.params.uid)) return res.status(404).send("Conta não encontrada");
+  try {
+    const senhaTemporaria = gerarSenhaTemporaria();
+    const conta = await Usuario.findByIdAndUpdate(
+      req.params.uid,
+      { senhaHash: gerarHashSenha(senhaTemporaria), trocarSenha: true },
+      { new: true }
+    ).lean();
+    if (!conta) return res.status(404).send("Conta não encontrada");
+    res.json({ usuario: contaPublica(conta), senhaTemporaria });
+  } catch (error) {
+    console.error("Erro ao gerar nova senha:", error);
+    res.status(500).send("Erro ao gerar nova senha");
   }
 });
 
@@ -551,6 +795,26 @@ app.get("/projeto/:id", async (req, res) => {
     console.error("Erro ao montar a prévia do projeto:", error);
     res.send(html); // sem a prévia, mas a página funciona normalmente
   }
+});
+
+// Regras para buscadores, com o endereço do sitemap no domínio em uso
+app.get("/robots.txt", (req, res) => {
+  res.type("text/plain");
+  res.setHeader("Cache-Control", "public, max-age=0, s-maxage=86400");
+  res.send(
+    [
+      "User-agent: *",
+      "Disallow: /login",
+      "Disallow: /adicionar-projeto",
+      "Disallow: /editar-projeto/",
+      "Disallow: /backup",
+      "Disallow: /contas",
+      "Disallow: /minha-conta",
+      "",
+      `Sitemap: ${origemDoSite(req)}/sitemap.xml`,
+      "",
+    ].join("\n")
+  );
 });
 
 // Lista de páginas para o Google encontrar todos os projetos

@@ -111,7 +111,25 @@ describe("login", () => {
     await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Senha incorreta");
-    expect(axios.post).toHaveBeenCalledWith("/auth/login", { senha: "errada" });
+    expect(axios.post).toHaveBeenCalledWith("/auth/login", { email: "", senha: "errada" });
+  });
+
+  test("conta com senha temporária vai direto criar a própria senha", async () => {
+    axios.post.mockResolvedValue({
+      data: {
+        token: "t",
+        expiraEm: Date.now() + 60000,
+        usuario: { id: "u1", nome: "Ana Costa", email: "ana@escola.com", papel: "autor", trocarSenha: true },
+      },
+    });
+    abrir("/login");
+
+    await userEvent.type(screen.getByLabelText("E-mail"), "ana@escola.com");
+    await userEvent.type(screen.getByLabelText("Senha"), "abcde-fghij");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+
+    expect(await screen.findByRole("heading", { name: "Crie a sua senha" })).toBeInTheDocument();
+    expect(axios.post).toHaveBeenCalledWith("/auth/login", { email: "ana@escola.com", senha: "abcde-fghij" });
   });
 
   test("muitas tentativas mostram o aviso de bloqueio", async () => {
@@ -127,6 +145,63 @@ describe("login", () => {
   test("páginas de professor exigem login", () => {
     abrir("/adicionar-projeto");
     expect(screen.getByRole("heading", { name: "Área do professor" })).toBeInTheDocument();
+  });
+});
+
+describe("contas individuais", () => {
+  const entrarComo = (usuario) =>
+    localStorage.setItem(
+      "ensine-musica:sessao",
+      JSON.stringify({ token: "t", expiraEm: Date.now() + 60000, usuario })
+    );
+  const AUTORA = { id: "u1", nome: "Ana Costa", email: "ana@escola.com", papel: "autor" };
+
+  test("autor só vê Editar e Apagar nos próprios projetos", async () => {
+    entrarComo(AUTORA);
+    axios.get.mockResolvedValue({ data: { ...PROJETOS[0], criadoPor: "outra-conta", publicadoPor: "Lucas" } });
+    abrir("/projeto/1");
+    expect(await screen.findByText("Publicado no site por Lucas")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Editar projeto" })).not.toBeInTheDocument();
+  });
+
+  test("autor vê Editar no projeto que publicou", async () => {
+    entrarComo(AUTORA);
+    axios.get.mockResolvedValue({ data: { ...PROJETOS[0], criadoPor: "u1", publicadoPor: "Ana Costa" } });
+    abrir("/projeto/1");
+    expect(await screen.findByRole("link", { name: "Editar projeto" })).toBeInTheDocument();
+  });
+
+  test("autor não entra nas páginas de administração", () => {
+    entrarComo(AUTORA);
+    axios.get.mockResolvedValue({ data: [] });
+    abrir("/contas");
+    expect(screen.queryByRole("heading", { name: "Contas" })).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  test("menu da conta mostra Contas e Backup só para administradores", async () => {
+    entrarComo({ ...AUTORA, papel: "admin" });
+    axios.get.mockResolvedValue({ data: PROJETOS });
+    abrir("/");
+    await userEvent.click(screen.getByRole("button", { name: "Conta de Ana Costa" }));
+    expect(screen.getAllByRole("link", { name: "Contas" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Backup" }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("legendas das fotos", () => {
+  test("aparecem embaixo das fotos e no texto alternativo", async () => {
+    axios.get.mockResolvedValue({
+      data: {
+        ...PROJETOS[0],
+        imagensPassoAPasso: ["https://exemplo.com/1.jpg", "https://exemplo.com/2.jpg"],
+        legendasPassoAPasso: ["Garrafas lavadas", ""],
+      },
+    });
+    abrir("/projeto/1");
+    expect(await screen.findByText("Garrafas lavadas")).toBeInTheDocument();
+    expect(screen.getByAltText("Passo 1 — Garrafas lavadas")).toBeInTheDocument();
+    expect(screen.getByAltText("Passo 2 da construção")).toBeInTheDocument();
   });
 });
 

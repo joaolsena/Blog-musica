@@ -59,6 +59,8 @@ test("senha certa devolve um token com validade", async () => {
   const dados = await resposta.json();
   assert.ok(dados.token);
   assert.ok(dados.expiraEm > Date.now());
+  assert.equal(dados.usuario.papel, "admin");
+  assert.equal(dados.usuario.principal, true);
   token = dados.token;
 });
 
@@ -73,6 +75,12 @@ test("rotas de escrita recusam pedidos sem token", async () => {
     ["POST", "/midias/remover"],
     ["GET", "/backup"],
     ["POST", "/backup/restaurar"],
+    ["GET", "/auth/eu"],
+    ["POST", "/auth/senha"],
+    ["GET", "/usuarios"],
+    ["POST", "/usuarios"],
+    ["PATCH", "/usuarios/6ac53dc9b97f33c7c5f9597f"],
+    ["POST", "/usuarios/6ac53dc9b97f33c7c5f9597f/nova-senha"],
   ];
   for (const [method, caminho] of pedidos) {
     const resposta = await fetch(base + caminho, { method });
@@ -183,6 +191,48 @@ test("só aceita vídeos do YouTube ou do Cloudinary desta conta", async () => {
     const resposta = await salvar({ videos: [video] });
     assert.equal(resposta.status, 400, video);
   }
+});
+
+test("legendas das fotos precisam ser textos curtos", async () => {
+  const imagensPassoAPasso = ["https://exemplo.com/1.jpg"];
+  for (const legendasPassoAPasso of [["x".repeat(161)], [42], "uma legenda"]) {
+    const resposta = await salvar({ imagensPassoAPasso, legendasPassoAPasso });
+    assert.equal(resposta.status, 400, JSON.stringify(legendasPassoAPasso).slice(0, 40));
+  }
+});
+
+test("conta principal: /auth/eu responde sem consultar o banco", async () => {
+  const resposta = await fetch(`${base}/auth/eu`, { headers: comToken() });
+  assert.equal(resposta.status, 200);
+  assert.equal((await resposta.json()).principal, true);
+});
+
+test("token de antes das contas (sem uid) continua valendo como conta principal", async () => {
+  const dados = Buffer.from(JSON.stringify({ exp: Date.now() + 60000 })).toString("base64url");
+  const assinatura = crypto.createHmac("sha256", SEGREDO).update(dados).digest("base64url");
+  const resposta = await fetch(`${base}/auth/eu`, { headers: comToken(`${dados}.${assinatura}`) });
+  assert.equal(resposta.status, 200);
+});
+
+test("a senha principal não é trocada pelo site", async () => {
+  const resposta = await fetch(`${base}/auth/senha`, {
+    method: "POST",
+    headers: { ...comToken(), "Content-Type": "application/json" },
+    body: JSON.stringify({ senhaAtual: SENHA, novaSenha: "outra-senha-longa" }),
+  });
+  assert.equal(resposta.status, 400);
+});
+
+test("criar conta exige nome, e-mail válido e papel conhecido", async () => {
+  const criar = (corpo) =>
+    fetch(`${base}/usuarios`, {
+      method: "POST",
+      headers: { ...comToken(), "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
+    });
+  assert.equal((await criar({ email: "a@b.com" })).status, 400);
+  assert.equal((await criar({ nome: "Ana", email: "sem-arroba" })).status, 400);
+  assert.equal((await criar({ nome: "Ana", email: "ana@escola.com", papel: "dono" })).status, 400);
 });
 
 test("ficha do projeto só aceita valores conhecidos", async () => {

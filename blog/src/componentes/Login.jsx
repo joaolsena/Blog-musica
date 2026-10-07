@@ -5,6 +5,7 @@ import { useAuth } from "./AuthContext";
 import { LogoMark } from "./Logo";
 
 const Login = () => {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [erro, setErro] = useState(null); // mensagem de erro exibida abaixo do campo
   const [entrando, setEntrando] = useState(false);
@@ -18,18 +19,25 @@ const Login = () => {
 
     // A senha é conferida pelo servidor
     setEntrando(true);
-    const resultado = await login(password);
+    const { resultado, usuario } = await login(email, password);
     setEntrando(false);
 
     if (resultado === "ok") {
-      toast.success("Bem-vindo de volta!");
+      // Senha temporária (conta nova ou senha gerada de novo): pede uma senha própria
+      if (usuario?.trocarSenha) {
+        toast("Crie uma senha só sua para continuar.");
+        navigate("/minha-conta");
+        return;
+      }
+      const primeiroNome = usuario?.principal ? "" : `, ${usuario?.nome?.split(" ")[0]}`;
+      toast.success(`Bem-vindo de volta${primeiroNome}!`);
       navigate("/"); // Redireciona para a página inicial após o login
       return;
     }
 
     setErro(
       {
-        "senha-incorreta": "Senha incorreta. Tente novamente.",
+        "senha-incorreta": email.trim() ? "E-mail ou senha incorretos." : "Senha incorreta. Tente novamente.",
         bloqueado: "Muitas tentativas erradas. Aguarde 15 minutos e tente de novo.",
       }[resultado] || "Não foi possível entrar agora. Tente novamente em instantes."
     );
@@ -45,7 +53,33 @@ const Login = () => {
       >
         <LogoMark size={44} />
         <h1>Área do professor</h1>
-        <p className="auth__hint">Digite a senha de acesso para gerenciar os projetos.</p>
+        <p className="auth__hint">Entre com o e-mail e a senha da sua conta.</p>
+
+        <div className="field">
+          <label htmlFor="login-email" className="field__label">
+            E-mail
+          </label>
+          <input
+            id="login-email"
+            type="email"
+            className="input"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setErro(null);
+            }}
+            autoComplete="username"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            enterKeyHint="next"
+            autoFocus
+            aria-describedby="login-email-dica"
+          />
+          <p id="login-email-dica" className="field__hint">
+            Administrador principal: deixe em branco e use a senha principal.
+          </p>
+        </div>
 
         <div className="field">
           <label htmlFor="login-password" className="field__label">
@@ -63,7 +97,6 @@ const Login = () => {
             autoComplete="current-password"
             enterKeyHint="go"
             required
-            autoFocus
             aria-invalid={Boolean(erro) || undefined}
             aria-describedby={erro ? "login-erro" : undefined}
           />

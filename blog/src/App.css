@@ -1394,8 +1394,22 @@
   margin-top: 24px;
 }
 
+.galeria__figura {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  margin: 0;
+}
+
+.galeria__legenda {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
 .galeria__item {
   position: relative;
+  width: 100%;
   aspect-ratio: 1;
   padding: 0;
   overflow: hidden;
@@ -2302,6 +2316,41 @@ legend.field__label {
   object-fit: cover;
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
+}
+
+/* Fotos do passo a passo com campo de legenda embaixo */
+.legendas-fotos,
+.imagens-atuais--legendas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.legenda-foto {
+  display: grid;
+  gap: 8px;
+  animation: surgir 300ms var(--ease-out) both;
+}
+
+.legenda-foto img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+
+.imagens-atuais--legendas .imagens-atuais__item {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.legenda-foto__campo {
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 1rem; /* 16px: menos que isso faz o iPhone dar zoom ao tocar */
 }
 
 /* Botão de remover: área de toque de 36px, mesmo sendo visualmente pequeno */
@@ -3245,9 +3294,18 @@ legend.field__label {
     margin-top: 4mm;
   }
 
+  .galeria__figura {
+    gap: 1.5mm;
+    break-inside: avoid;
+  }
+
   .galeria__item {
     border-radius: 2mm;
-    break-inside: avoid;
+  }
+
+  .galeria__legenda {
+    font-size: 8.5pt;
+    line-height: 1.3;
   }
 
   .videos-impressos {
@@ -3418,3 +3476,306 @@ legend.field__label {
   max-width: 60ch;
   color: var(--ink-2);
 }
+
+/* --------------------------------------------------------------------------
+   Menu da conta (cabeçalho)
+   -------------------------------------------------------------------------- */
+
+.conta {
+  position: relative;
+}
+
+.conta__botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+  transition:
+    border-color 200ms ease,
+    transform 160ms var(--ease-out);
+}
+
+.conta__botao:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .conta__botao:hover {
+    border-color: var(--line-strong);
+  }
+}
+
+.conta__avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--on-accent);
+}
+
+.conta__seta {
+  color: var(--muted);
+  transition: transform 220ms var(--ease-out);
+}
+
+.conta__botao[aria-expanded="true"] .conta__seta {
+  transform: rotate(180deg);
+}
+
+.conta__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  display: grid;
+  width: 230px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  transform-origin: top right;
+  opacity: 0;
+  transform: scale(0.96) translateY(-4px);
+  visibility: hidden;
+  transition:
+    opacity 120ms ease,
+    transform 120ms var(--ease-out),
+    visibility 0s linear 120ms;
+}
+
+.conta__menu[data-aberto="true"] {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition:
+    opacity 180ms ease,
+    transform 180ms var(--ease-out),
+    visibility 0s;
+}
+
+.conta__quem {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.875rem;
+}
+
+.conta__quem span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.conta__item {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 0.9375rem;
+  text-align: left;
+  color: var(--ink);
+  transition: background-color 150ms ease;
+}
+
+.conta__item--sair {
+  color: var(--accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .conta__item:hover {
+    background: var(--surface-sunken);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conta__menu,
+  .conta__menu[data-aberto="true"] {
+    transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Contas: minha conta, gerenciamento e senha temporária
+   -------------------------------------------------------------------------- */
+
+.link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  text-underline-offset: 3px;
+}
+
+.perfil {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.perfil__avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--on-accent);
+}
+
+.perfil__nome {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.perfil__detalhe {
+  color: var(--muted);
+}
+
+.aviso-senha {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.artigo__publicado {
+  margin-top: 40px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.senha-temporaria {
+  display: grid;
+  gap: 10px;
+  padding: clamp(20px, 4vw, 28px);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  animation: surgir 300ms var(--ease-out) both;
+}
+
+.senha-temporaria__titulo {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.senha-temporaria__senha {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  user-select: all;
+}
+
+.senha-temporaria__dica {
+  font-size: 0.875rem;
+  color: var(--ink-2);
+}
+
+.senha-temporaria__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.contas-lista {
+  display: grid;
+  padding: 0;
+  list-style: none;
+}
+
+.conta-linha {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px 14px;
+  align-items: start;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.conta-linha:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.conta-linha[data-ativa="false"] .conta-linha__info {
+  opacity: 0.6;
+}
+
+.conta-linha .conta__avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 0.875rem;
+}
+
+.conta-linha__nome {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.conta-linha__voce {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.conta-linha__email {
+  font-size: 0.875rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.conta-linha__selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.selo {
+  padding: 2px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.selo--alerta {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.conta-linha__acoes {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+

@@ -15,6 +15,8 @@ import Projetos from "./componentes/Projetos"; // Página inicial
 import AdicionarProjeto from "./componentes/AdicionarProjeto"; // Página de adicionar projeto
 import EditProjeto from "./componentes/EditProjeto"; // Página de edição do projeto
 import Backup from "./componentes/Backup"; // Backup dos projetos (área do professor)
+import Contas from "./componentes/Contas"; // Contas de professores e alunos (administradores)
+import MinhaConta from "./componentes/MinhaConta"; // Dados e senha da própria conta
 import LoginPage from "./componentes/Login"; // Tela de login
 import { AuthProvider } from "./componentes/AuthContext"; // Provedor do contexto de autenticação
 import PrivateRoute from "./componentes/PrivateRoute"; // Componente para proteger rotas privadas
@@ -71,8 +73,26 @@ function Paginas() {
         <Route
           path="/backup"
           element={
-            <PrivateRoute>
+            <PrivateRoute apenasAdmin>
               <Backup />
+            </PrivateRoute>
+          }
+        />
+
+        {/* Contas: a própria (todos) e o gerenciamento (administradores) */}
+        <Route
+          path="/minha-conta"
+          element={
+            <PrivateRoute>
+              <MinhaConta />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/contas"
+          element={
+            <PrivateRoute apenasAdmin>
+              <Contas />
             </PrivateRoute>
           }
         />

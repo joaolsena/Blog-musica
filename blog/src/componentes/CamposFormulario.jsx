@@ -115,8 +115,32 @@ export function FichaProjeto({ valor, onChange }) {
   );
 }
 
+export const LIMITE_LEGENDA = 160; // deve bater com o servidor (server.js)
+
+// Campo de legenda embaixo de uma foto do passo a passo
+function CampoLegenda({ id, indice, valor, onChange }) {
+  return (
+    <>
+      <label htmlFor={id} className="sr-only">
+        Legenda da foto {indice + 1}
+      </label>
+      <input
+        id={id}
+        className="input legenda-foto__campo"
+        type="text"
+        placeholder="Legenda (opcional)"
+        maxLength={LIMITE_LEGENDA}
+        value={valor || ""}
+        onChange={(e) => onChange(indice, e.target.value)}
+        enterKeyHint="next"
+      />
+    </>
+  );
+}
+
 // Área de envio de imagens com pré-visualização
-export function EnvioImagens({ id, rotulo, dica, arquivos, multiplo = false, accept, onChange }) {
+// Com legendas/onLegenda, cada prévia ganha um campo de legenda (fotos do passo a passo)
+export function EnvioImagens({ id, rotulo, dica, arquivos, multiplo = false, accept, onChange, legendas, onLegenda }) {
   // URLs temporárias para as prévias; liberadas quando os arquivos mudam
   const previas = useMemo(() => arquivos.map((arquivo) => URL.createObjectURL(arquivo)), [arquivos]);
   useEffect(() => () => previas.forEach((url) => URL.revokeObjectURL(url)), [previas]);
@@ -155,24 +179,36 @@ export function EnvioImagens({ id, rotulo, dica, arquivos, multiplo = false, acc
         </span>
       </label>
 
-      {previas.length > 0 && (
+      {previas.length > 0 && !onLegenda && (
         <div className="previews">
           {previas.map((url, index) => (
             <img key={url} src={url} alt={`Pré-visualização ${index + 1}`} />
           ))}
         </div>
       )}
+
+      {previas.length > 0 && onLegenda && (
+        <ul className="legendas-fotos">
+          {previas.map((url, index) => (
+            <li key={url} className="legenda-foto">
+              <img src={url} alt={`Pré-visualização ${index + 1}`} />
+              <CampoLegenda id={`${id}-legenda-${index}`} indice={index} valor={legendas?.[index]} onChange={onLegenda} />
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
 // Imagens já salvas no projeto, cada uma com um botão para removê-la
-export function ImagensAtuais({ rotulo, urls, onRemover }) {
+// (e, com legendas/onLegenda, um campo para editar a legenda)
+export function ImagensAtuais({ rotulo, urls, onRemover, legendas, onLegenda }) {
   if (urls.length === 0) return null;
   return (
     <div className="field">
       <span className="field__label">{rotulo}</span>
-      <ul className="imagens-atuais">
+      <ul className={onLegenda ? "imagens-atuais imagens-atuais--legendas" : "imagens-atuais"}>
         {urls.map((url, index) => (
           <li key={url} className="imagens-atuais__item">
             <img src={urlImagem(url, 300)} alt={`${rotulo} ${urls.length > 1 ? index + 1 : ""}`.trim()} />
@@ -186,6 +222,9 @@ export function ImagensAtuais({ rotulo, urls, onRemover }) {
                 <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
               </svg>
             </button>
+            {onLegenda && (
+              <CampoLegenda id={`legenda-atual-${index}`} indice={index} valor={legendas?.[index]} onChange={onLegenda} />
+            )}
           </li>
         ))}
       </ul>

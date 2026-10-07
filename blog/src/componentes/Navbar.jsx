@@ -3,10 +3,11 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import Logo from "./Logo";
 import { BotaoInstalar } from "./InstalarApp";
+import MenuConta from "./MenuConta";
 import { BotaoTema } from "./Tema";
 
 function Navbar() {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, ehAdmin, logout } = useAuth();
   const [menuAberto, setMenuAberto] = useState(false);
   const [rolou, setRolou] = useState(false);
   const location = useLocation();
@@ -88,16 +89,7 @@ function Navbar() {
                     </svg>
                     Novo projeto
                   </Link>
-                  <NavLink to="/backup" className="nav-link nav-link--quiet">
-                    Backup
-                  </NavLink>
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--sm"
-                    onClick={logout}
-                  >
-                    Sair
-                  </button>
+                  <MenuConta />
                 </>
               ) : (
                 <NavLink to="/login" className="nav-link nav-link--quiet">
@@ -152,12 +144,22 @@ function Navbar() {
                   Novo projeto
                 </NavLink>
               </li>
-              <li style={{ "--i": links.length + 1 }}>
-                <NavLink to="/backup" className="mobile-menu__link">
-                  Backup
-                </NavLink>
-              </li>
-              <li style={{ "--i": links.length + 2 }}>
+              {[
+                { to: "/minha-conta", rotulo: "Minha conta" },
+                ...(ehAdmin
+                  ? [
+                      { to: "/contas", rotulo: "Contas" },
+                      { to: "/backup", rotulo: "Backup" },
+                    ]
+                  : []),
+              ].map((link, index) => (
+                <li key={link.to} style={{ "--i": links.length + 1 + index }}>
+                  <NavLink to={link.to} className="mobile-menu__link">
+                    {link.rotulo}
+                  </NavLink>
+                </li>
+              ))}
+              <li style={{ "--i": links.length + (ehAdmin ? 4 : 2) }}>
                 <button
                   type="button"
                   className="mobile-menu__link"

@@ -8,6 +8,7 @@
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/projeto/:id", "destination": "/api" },
     { "source": "/sitemap.xml", "destination": "/api" },
+    { "source": "/robots.txt", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

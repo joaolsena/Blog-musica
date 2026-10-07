@@ -14,7 +14,8 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 - Rascunho automático ao cadastrar um projeto: textos, fotos e vídeos voltam se a página recarregar
 - Backup: botão para baixar e restaurar (área do professor) e cópia automática toda segunda-feira no GitHub (branch `backups`)
 - Botão de compartilhar: menu nativo do celular (WhatsApp, Instagram etc.) ou, no computador, WhatsApp, Telegram, Facebook, e-mail e "copiar link"
-- Área do professor, protegida por senha, para publicar, editar e apagar projetos e suas fotos
+- Contas individuais: **administradores** (tudo, inclusive contas e backup) e **autores** (publicam e editam só os próprios projetos). Conta nova recebe senha temporária e cria a própria no primeiro acesso. A senha principal (`ADMIN_PASSWORD`, com o e-mail em branco no login) continua valendo como chave reserva
+- Legenda em cada foto do passo a passo (aparece embaixo da foto, na tela cheia e para leitores de tela)
 - Modo claro e escuro, layout para computador e celular
 - Instalável como app (iPhone, iPad, Android, Mac e Windows): botão discreto no cabeçalho e no rodapé. No Chrome e no Edge abre a janela de instalação do sistema; no Safari e nos outros, mostra o passo a passo. Depois de instalado, abre sem internet o que já foi visto
 - Projetos guardados no aparelho: a última versão vista aparece na hora, com o aviso "Sincronizando…" enquanto o servidor responde (e "Sem conexão" com o horário da versão mostrada, se não houver internet)
@@ -88,9 +89,10 @@ Outros comandos do site:
 | --- | --- | --- |
 | `MONGO_URI` | sim | Conexão com o MongoDB Atlas |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | sim | Envio e remoção de imagens e vídeos |
-| `ADMIN_PASSWORD` | sim | Senha da área do professor |
+| `ADMIN_PASSWORD` | sim | Senha principal (entra como administrador, com o e-mail em branco) |
 | `TOKEN_SECRET` | sim | Chave que assina os tokens de login |
 | `CORS_ORIGIN` | não | Restringe quais sites podem chamar a API |
+| `SITE_URL` | não | Endereço oficial do site (ex.: `https://ensinemusica.com.br`), usado nos links canônicos, no sitemap e no robots.txt. Sem ela, vale o endereço acessado |
 | `PORT` | não | Porta do servidor (padrão 4000) |
 
 Sem `ADMIN_PASSWORD` e `TOKEN_SECRET`, o site continua mostrando os projetos, mas ninguém consegue publicar, editar ou apagar.
@@ -121,17 +123,30 @@ Site e servidor ficam no mesmo projeto do Vercel (`ensine-musica`). O `vercel.js
 2. No MongoDB Atlas, em Network Access, libere o acesso de qualquer IP (`0.0.0.0/0`): o Vercel não tem IP fixo.
 3. Publique com `vercel deploy --prod` na raiz do repositório (ou conecte o repositório do GitHub ao projeto para publicar a cada push).
 
-**Backup automático:** `.github/workflows/backup.yml` roda toda segunda-feira às 6h (horário de Belém), baixa os projetos de `/api/projetos` e guarda uma cópia datada na branch `backups`. Para rodar na hora: aba Actions do GitHub > Backup dos projetos > Run workflow. Para restaurar, entre no site como professor > Backup > Restaurar. Se mudar o endereço do site, atualize `SITE` nesse arquivo e a linha `Sitemap:` de `blog/public/robots.txt`.
+**Backup automático:** `.github/workflows/backup.yml` roda toda segunda-feira às 6h (horário de Belém), baixa os projetos de `/api/projetos` e guarda uma cópia datada na branch `backups`. Para rodar na hora: aba Actions do GitHub > Backup dos projetos > Run workflow. Para restaurar, entre no site como professor > Backup > Restaurar. Com domínio próprio, crie a variável `SITE_URL` do repositório (veja abaixo).
+
+**Domínio próprio** (ex.: `ensinemusica.com.br`, comprado no [Registro.br](https://registro.br)):
+1. No Vercel: projeto `ensine-musica` > Settings > Domains > Add, e digite o domínio. O Vercel mostra os registros de DNS.
+2. No Registro.br: no domínio, em DNS, use os servidores do Vercel (`ns1.vercel-dns.com` e `ns2.vercel-dns.com`) ou crie os registros que o Vercel mostrou.
+3. No Vercel, em Environment Variables, crie `SITE_URL` com o endereço novo e publique de novo. A prévia de links passa a usar o domínio sozinha (o build lê o domínio principal do projeto).
+4. No GitHub: Settings > Secrets and variables > Actions > Variables, crie `SITE_URL` com o endereço novo (usado pelo backup semanal).
+5. Opcional: no Vercel, em Domains, faça `ensine-musica.vercel.app` redirecionar para o domínio novo.
 
 No Vercel, cada envio ao servidor tem limite de 4,5 MB. Por isso o site reduz as fotos para 2000 px no navegador antes de enviar, e os vídeos vão direto ao Cloudinary.
 
 ## Rotas da API
 
-Todas começam com `/api`. As marcadas com 🔒 exigem o token de login no cabeçalho `Authorization: Bearer <token>`.
+Todas começam com `/api`. As marcadas com 🔒 exigem o token de login no cabeçalho `Authorization: Bearer <token>`; as marcadas com 👑, uma conta de administrador. Autores só editam e apagam os projetos que publicaram.
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| POST | `/auth/login` | Recebe `{ senha }` e devolve `{ token, expiraEm }` (válido por 7 dias) |
+| POST | `/auth/login` | Recebe `{ email, senha }` (e-mail em branco: senha principal) e devolve `{ token, expiraEm, usuario }` (válido por 7 dias) |
+| GET | `/auth/eu` 🔒 | Dados da conta logada |
+| POST | `/auth/senha` 🔒 | Troca a própria senha (`{ senhaAtual, novaSenha }`) |
+| GET | `/usuarios` 👑 | Lista as contas |
+| POST | `/usuarios` 👑 | Cria uma conta (`{ nome, email, papel }`) e devolve a senha temporária |
+| PATCH | `/usuarios/:id` 👑 | Muda nome, papel (`admin`/`autor`) ou ativa/desativa |
+| POST | `/usuarios/:id/nova-senha` 👑 | Gera uma nova senha temporária |
 | GET | `/projetos` | Lista os projetos |
 | GET | `/projetos/:id` | Um projeto |
 | POST | `/adicionar` 🔒 | Cria um projeto (até 20 imagens no passo a passo e 5 vídeos) |
@@ -140,10 +155,10 @@ Todas começam com `/api`. As marcadas com 🔒 exigem o token de login no cabe�
 | POST | `/upload` 🔒 | Envia uma imagem (JPG/PNG, até 10 MB); uma por requisição |
 | POST | `/videos/assinatura` 🔒 | Autoriza o navegador a enviar um vídeo (até 100 MB) direto ao Cloudinary |
 | POST | `/midias/remover` 🔒 | Apaga imagens e vídeos enviados que não ficaram em nenhum projeto |
-| GET | `/backup` 🔒 | Baixa todos os projetos num arquivo JSON |
-| POST | `/backup/restaurar` 🔒 | Recria, a partir de um backup, os projetos que não existem mais (nunca sobrescreve) |
+| GET | `/backup` 👑 | Baixa todos os projetos num arquivo JSON |
+| POST | `/backup/restaurar` 👑 | Recria, a partir de um backup, os projetos que não existem mais (nunca sobrescreve) |
 
-Fora da API, o servidor também responde `/projeto/:id` (a página do site com título, descrição e foto do projeto para a prévia de links) e `/sitemap.xml`. No Vercel, essas rotas são encaminhadas ao servidor pelo `vercel.json`.
+Fora da API, o servidor também responde `/projeto/:id` (a página do site com título, descrição e foto do projeto para a prévia de links), `/sitemap.xml` e `/robots.txt`. No Vercel, essas rotas são encaminhadas ao servidor pelo `vercel.json`.
 
 Vídeos aceitos ao salvar: links do YouTube (`https://www.youtube.com/watch?v=...`) ou vídeos da pasta `videos/` desta conta do Cloudinary. Qualquer outro endereço é recusado.
 
