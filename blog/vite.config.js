@@ -17,7 +17,8 @@ export default defineConfig({
   // host: true deixa o site acessível pelo celular na mesma rede Wi-Fi
   server: { port: 3000, host: true, proxy },
   preview: { port: 3000, proxy },
-  build: { outDir: "dist" },
+  // O gerador de PDF (~1 MB) fica num arquivo à parte, baixado só ao tocar em "Baixar PDF"
+  build: { outDir: "dist", chunkSizeWarningLimit: 1100 },
   test: {
     environment: "jsdom",
     globals: true,

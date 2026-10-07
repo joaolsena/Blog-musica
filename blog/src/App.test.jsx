@@ -2,6 +2,10 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axios from "axios";
 import App from "./App";
+import { baixarPdf } from "./componentes/baixarPdf";
+
+// O PDF de verdade é gerado no navegador; aqui só confere que o botão chama o gerador
+vi.mock("./componentes/baixarPdf", () => ({ baixarPdf: vi.fn(() => Promise.resolve()) }));
 
 // Simula o servidor: nenhum teste faz requisições de verdade
 vi.mock("axios", () => {
@@ -281,7 +285,7 @@ describe("ficha do projeto (turma, nível e duração)", () => {
     expect(screen.queryByRole("button", { name: /Turma, nível e duração/ })).not.toBeInTheDocument();
   });
 
-  test("a página do projeto mostra a ficha e o botão de imprimir", async () => {
+  test("a página do projeto mostra a ficha e o botão de baixar o PDF", async () => {
     axios.get.mockResolvedValue({ data: COM_FICHA[0] });
     abrir("/projeto/1");
 
@@ -289,8 +293,10 @@ describe("ficha do projeto (turma, nível e duração)", () => {
     expect(screen.getByText("Fácil")).toBeInTheDocument();
     expect(screen.getByText("1 aula")).toBeInTheDocument();
 
-    const imprimir = vi.spyOn(window, "print").mockImplementation(() => {});
-    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
-    expect(imprimir).toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Baixar PDF" }));
+    expect(baixarPdf).toHaveBeenCalledWith(
+      expect.objectContaining({ titulo: COM_FICHA[0].titulo }),
+      `${window.location.origin}/projeto/${COM_FICHA[0]._id}`
+    );
   });
 });

@@ -81,18 +81,38 @@ function Ficha({ projeto }) {
   );
 }
 
-// Abre a impressão do navegador, que também permite salvar em PDF.
-// O layout de papel (sem menus, fotos menores, lista de materiais para marcar) fica no App.css.
-function BotaoImprimir() {
+// Gera o PDF do projeto (com fotos, ficha e materiais para marcar) e baixa o arquivo.
+// O gerador só é carregado no primeiro toque, para não pesar a página.
+function BotaoBaixarPdf({ projeto }) {
+  const [gerando, setGerando] = useState(false);
+
+  const baixar = async () => {
+    setGerando(true);
+    try {
+      const { baixarPdf } = await import("./baixarPdf");
+      await baixarPdf(projeto, `${window.location.origin}/projeto/${projeto._id}`);
+    } catch (error) {
+      console.error("Erro ao gerar o PDF:", error);
+      toast.error("Não foi possível gerar o PDF agora. Verifique a conexão e tente de novo.");
+    } finally {
+      setGerando(false);
+    }
+  };
+
   return (
-    <button type="button" className="btn btn--ghost compartilhar__botao botao-imprimir" onClick={() => window.print()}>
+    <button
+      type="button"
+      className="btn btn--ghost compartilhar__botao"
+      onClick={baixar}
+      disabled={gerando}
+      aria-busy={gerando}
+    >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
         strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M7 8V3.5h10V8" />
-        <rect x="3.5" y="8" width="17" height="8.5" rx="2" />
-        <path d="M7 13.5h10v7H7z" />
+        <path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z" />
+        <path d="M14 3.5v5h5M12 11.5v6M9.5 15l2.5 2.5 2.5-2.5" />
       </svg>
-      Imprimir
+      {gerando ? "Gerando PDF…" : "Baixar PDF"}
     </button>
   );
 }
@@ -268,7 +288,7 @@ function ProjetoDetalhes() {
           </p>
           <div className="artigo__botoes">
             <BotaoCompartilhar titulo={projeto.titulo} />
-            <BotaoImprimir />
+            <BotaoBaixarPdf projeto={projeto} />
           </div>
         </div>
         <Ficha projeto={projeto} />

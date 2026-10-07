@@ -9,7 +9,7 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 - Lista de projetos com busca e filtro por tipo (instrumento ou jogo)
 - Página de cada projeto: materiais, passo a passo com até 20 fotos, vídeos (link do YouTube ou arquivo enviado), instruções de uso e aplicação didática
 - Ficha de cada projeto (para quem é, nível e duração) e filtros por turma, nível e duração na página inicial
-- Versão para imprimir ou salvar em PDF, com os materiais em lista para marcar
+- Botão "Baixar PDF" em cada projeto: arquivo pronto para imprimir, com capa, ficha, materiais em lista para marcar, fotos do passo a passo com legendas e links dos vídeos. Os textos longos saem justificados; as referências, alinhadas à esquerda. O PDF é gerado no próprio navegador, com as fontes do site (`blog/src/assets/fontes`, licença OFL)
 - Prévia própria de cada projeto ao compartilhar o link (título, descrição e foto no WhatsApp, Facebook etc.) e sitemap para o Google
 - Rascunho automático ao cadastrar um projeto: textos, fotos e vídeos voltam se a página recarregar
 - Backup: botão para baixar e restaurar (área do professor) e cópia automática toda segunda-feira no GitHub (branch `backups`)

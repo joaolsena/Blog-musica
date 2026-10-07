@@ -3287,6 +3287,13 @@ legend.field__label {
     break-inside: avoid;
   }
 
+  /* Textos longos justificados (as referências, não) */
+  .secao__lead,
+  .secao p:not(.referencias),
+  .etapas li {
+    text-align: justify;
+  }
+
   /* Fotos menores: quatro por linha */
   .galeria {
     grid-template-columns: repeat(4, 1fr);
