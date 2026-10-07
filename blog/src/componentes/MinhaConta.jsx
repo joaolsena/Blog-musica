@@ -79,7 +79,8 @@ function MinhaConta() {
               <Link to="/contas" className="link">
                 Contas
               </Link>{" "}
-              e use-a no dia a dia. A senha principal é trocada nas configurações do servidor (ADMIN_PASSWORD).
+              e use-a no dia a dia. Depois disso, você pode apagar a senha principal (a variável ADMIN_PASSWORD, no
+              Vercel): só as contas entram. Se um dia perder o acesso, é só recriá-la lá.
             </p>
           </section>
         ) : (

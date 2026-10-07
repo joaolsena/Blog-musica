@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Sem e-mail, entra na conta principal. Retorna { resultado, usuario }, com resultado
-  // "ok", "senha-incorreta", "bloqueado" ou "erro"
+  // "ok", "senha-incorreta", "email-obrigatorio", "bloqueado" ou "erro"
   const login = async (email, senha) => {
     try {
       const { data } = await axios.post("/auth/login", { email: email.trim(), senha });
@@ -70,6 +70,7 @@ export const AuthProvider = ({ children }) => {
       return { resultado: "ok", usuario: data.usuario };
     } catch (error) {
       const status = error.response?.status;
+      if (status === 400) return { resultado: "email-obrigatorio" };
       if (status === 401) return { resultado: "senha-incorreta" };
       if (status === 429) return { resultado: "bloqueado" };
       return { resultado: "erro" };

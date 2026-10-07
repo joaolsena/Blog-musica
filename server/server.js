@@ -33,16 +33,21 @@ api.param("id", (req, res, next, id) => {
 const dataDeHoje = () => new Date().toLocaleDateString("pt-BR", { timeZone: "America/Belem" });
 
 // **Autenticação do professor**
-// A senha fica só no servidor (variável ADMIN_PASSWORD). Quem acerta a senha recebe um
-// token assinado com TOKEN_SECRET, que precisa ser enviado no cabeçalho Authorization
-// em toda rota que cria, edita ou apaga algo.
+// Quem entra recebe um token assinado com TOKEN_SECRET, que precisa ser enviado no
+// cabeçalho Authorization em toda rota que cria, edita ou apaga algo.
+// Contas individuais entram com e-mail e senha. A senha principal (ADMIN_PASSWORD, com o
+// e-mail em branco) é opcional: serve para o primeiro acesso e como chave reserva. Sem
+// ela, só as contas individuais entram; para recuperar o acesso, basta recriá-la no Vercel.
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const TOKEN_SECRET = process.env.TOKEN_SECRET;
 const DURACAO_TOKEN_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
-const autenticacaoConfigurada = Boolean(ADMIN_PASSWORD && TOKEN_SECRET);
+const autenticacaoConfigurada = Boolean(TOKEN_SECRET);
+const senhaPrincipalAtiva = Boolean(ADMIN_PASSWORD);
 
 if (!autenticacaoConfigurada) {
-  console.error("ADMIN_PASSWORD e TOKEN_SECRET não configurados: criar, editar e apagar projetos está desativado.");
+  console.error("TOKEN_SECRET não configurado: entrar, criar, editar e apagar projetos está desativado.");
+} else if (!senhaPrincipalAtiva) {
+  console.log("ADMIN_PASSWORD não configurada: só as contas individuais podem entrar.");
 }
 
 const assinar = (dados) => crypto.createHmac("sha256", TOKEN_SECRET).update(dados).digest("base64url");
@@ -90,6 +95,7 @@ const exigirLogin = async (req, res, next) => {
     return res.status(401).send("Acesso não autorizado");
   }
   if (!conteudo.uid) {
+    if (!senhaPrincipalAtiva) return res.status(401).send("A senha principal foi desativada. Entre com a sua conta.");
     req.usuario = CONTA_PRINCIPAL;
     return next();
   }
@@ -168,6 +174,7 @@ api.post("/auth/login", async (req, res) => {
 
   // Sem e-mail: conta principal (senha ADMIN_PASSWORD)
   if (!email) {
+    if (!senhaPrincipalAtiva) return res.status(400).send("Informe o seu e-mail.");
     if (!iguais(senha, ADMIN_PASSWORD)) return errou();
     tentativasPorIp.delete(req.ip);
     return res.json({ ...criarToken(), usuario: CONTA_PRINCIPAL });

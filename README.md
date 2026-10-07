@@ -89,13 +89,13 @@ Outros comandos do site:
 | --- | --- | --- |
 | `MONGO_URI` | sim | Conexão com o MongoDB Atlas |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | sim | Envio e remoção de imagens e vídeos |
-| `ADMIN_PASSWORD` | sim | Senha principal (entra como administrador, com o e-mail em branco) |
+| `ADMIN_PASSWORD` | não | Senha principal: entra como administrador com o e-mail em branco. Use no primeiro acesso para criar as contas; depois pode apagar (só as contas entram). Para recuperar o acesso, recrie-a |
 | `TOKEN_SECRET` | sim | Chave que assina os tokens de login |
 | `CORS_ORIGIN` | não | Restringe quais sites podem chamar a API |
 | `SITE_URL` | não | Endereço oficial do site (ex.: `https://ensinemusica.com.br`), usado nos links canônicos, no sitemap e no robots.txt. Sem ela, vale o endereço acessado |
 | `PORT` | não | Porta do servidor (padrão 4000) |
 
-Sem `ADMIN_PASSWORD` e `TOKEN_SECRET`, o site continua mostrando os projetos, mas ninguém consegue publicar, editar ou apagar.
+Sem `TOKEN_SECRET`, o site continua mostrando os projetos, mas ninguém consegue entrar, publicar, editar ou apagar.
 
 **Site:**
 

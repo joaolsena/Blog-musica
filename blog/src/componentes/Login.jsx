@@ -38,6 +38,7 @@ const Login = () => {
     setErro(
       {
         "senha-incorreta": email.trim() ? "E-mail ou senha incorretos." : "Senha incorreta. Tente novamente.",
+        "email-obrigatorio": "Informe o e-mail da sua conta.",
         bloqueado: "Muitas tentativas erradas. Aguarde 15 minutos e tente de novo.",
       }[resultado] || "Não foi possível entrar agora. Tente novamente em instantes."
     );
@@ -77,7 +78,7 @@ const Login = () => {
             aria-describedby="login-email-dica"
           />
           <p id="login-email-dica" className="field__hint">
-            Administrador principal: deixe em branco e use a senha principal.
+            Para entrar com a senha principal do site, deixe em branco.
           </p>
         </div>
 
