@@ -121,3 +121,40 @@ test("datas das mensagens em linguagem do dia a dia", () => {
   expect(quando("2026-10-06T15:00:00", agora)).toBe("ontem");
   expect(quando("2026-08-01T10:00:00", agora)).toMatch(/1 de ago/);
 });
+
+test("plano de aula guarda rascunho: volta ao reabrir e pode ser descartado", async () => {
+  localStorage.setItem(
+    "ensine-musica:sessao",
+    JSON.stringify({ token: "t", expiraEm: Date.now() + 3600_000, usuario: { id: "u1", nome: "Ana Costa", papel: "autor" } })
+  );
+  servidor({ "/projetos": [PROJETO] });
+  const { unmount } = abrir("/novo-plano");
+
+  await userEvent.type(await screen.findByLabelText("Título"), "Pulsação com chocalhos");
+  expect(await screen.findByText(/Rascunho salvo neste aparelho/, {}, { timeout: 2000 })).toBeInTheDocument();
+  expect(localStorage.getItem("ensine-musica:rascunho-plano:novo")).toContain("Pulsação com chocalhos");
+
+  // Saiu da página (ou o login venceu) e voltou: o texto continua lá
+  unmount();
+  abrir("/novo-plano");
+  expect(await screen.findByLabelText("Título")).toHaveValue("Pulsação com chocalhos");
+  expect(screen.getByLabelText("Quem escreveu")).toHaveValue("Ana Costa");
+
+  await userEvent.click(screen.getByRole("button", { name: "Descartar" }));
+  expect(screen.getByLabelText("Título")).toHaveValue("");
+  expect(localStorage.getItem("ensine-musica:rascunho-plano:novo")).toBeNull();
+});
+
+test("página de privacidade: link no rodapé e lembrete nos formulários do público", async () => {
+  servidor({ "/forum": TOPICOS });
+  abrir("/forum");
+  await screen.findByText("Como afinar o violão de caixa?");
+  expect(within(screen.getByRole("contentinfo")).getByRole("link", { name: "Privacidade" })).toHaveAttribute("href", "/privacidade");
+
+  await userEvent.click(screen.getByRole("button", { name: "Novo tópico" }));
+  expect(screen.getByText(/Não escreva telefone, endereço nem dados de alunos/)).toBeInTheDocument();
+
+  await userEvent.click(within(screen.getByRole("contentinfo")).getByRole("link", { name: "Privacidade" }));
+  expect(await screen.findByRole("heading", { level: 1, name: "Privacidade" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Alunos e menores de idade" })).toBeInTheDocument();
+});

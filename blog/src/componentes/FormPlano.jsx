@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "./AuthContext";
 import { Campo, FichaProjeto } from "./CamposFormulario";
 import { urlImagem } from "./imagens";
-import { lerProjetosSalvos } from "./memoria";
+import { lerProjetosSalvos, quandoFoiSalvo } from "./memoria";
 import { mensagemDoErro } from "./comunidade";
 import { rotuloTipo } from "./tipos";
 
@@ -24,6 +24,38 @@ const PLANO_VAZIO = {
 };
 
 const LIMITE_PROJETOS = 10; // deve bater com o servidor (planos.js)
+
+// Rascunho automático: o que foi digitado fica guardado neste aparelho até o plano ser
+// publicado. Assim nada se perde se a página recarregar ou o login vencer no meio do texto.
+// Um rascunho para o plano novo e um para cada plano em edição.
+const chaveRascunho = (id) => `ensine-musica:rascunho-plano:${id || "novo"}`;
+
+function lerRascunho(chave) {
+  try {
+    const rascunho = JSON.parse(localStorage.getItem(chave));
+    return rascunho?.plano ? rascunho : null;
+  } catch {
+    return null;
+  }
+}
+
+function gravarRascunho(chave, plano) {
+  try {
+    const salvoEm = Date.now();
+    localStorage.setItem(chave, JSON.stringify({ plano, salvoEm }));
+    return salvoEm;
+  } catch {
+    return null; // sem armazenamento (aba anônima): segue sem rascunho
+  }
+}
+
+function apagarRascunho(chave) {
+  try {
+    localStorage.removeItem(chave);
+  } catch {
+    // nada a apagar
+  }
+}
 
 // Escolha dos projetos do site usados na aula (busca + lista com caixas de marcar)
 function SeletorProjetos({ selecionados, onChange }) {
@@ -100,8 +132,62 @@ function FormPlano() {
   const { id } = useParams(); // com id: editar; sem: novo
   const { usuario, podeEditar } = useAuth();
   const navigate = useNavigate();
-  const [plano, setPlano] = useState(id ? null : { ...PLANO_VAZIO, autor: usuario?.principal ? "" : usuario?.nome || "" });
+  const [plano, setPlano] = useState(null);
+  const [original, setOriginal] = useState(null); // o plano sem as mudanças (para comparar e descartar)
+  const [rascunhoSalvoEm, setRascunhoSalvoEm] = useState(null);
   const [enviando, setEnviando] = useState(false);
+  const publicado = useRef(false);
+  const chave = chaveRascunho(id);
+
+  const descartarRascunho = useCallback(
+    (base) => {
+      apagarRascunho(chave);
+      setPlano(base);
+      setRascunhoSalvoEm(null);
+    },
+    [chave]
+  );
+
+  // Começa do plano (novo ou salvo) e, se houver rascunho, continua de onde parou
+  const comecar = useCallback(
+    (base) => {
+      setOriginal(base);
+      const rascunho = lerRascunho(chave);
+      if (!rascunho) {
+        setPlano(base);
+        return;
+      }
+      setPlano({ ...base, ...rascunho.plano });
+      setRascunhoSalvoEm(rascunho.salvoEm);
+      toast("Rascunho recuperado", {
+        description: `Você continua de onde parou (salvo ${quandoFoiSalvo(rascunho.salvoEm)}).`,
+        action: { label: "Descartar", onClick: () => descartarRascunho(base) },
+      });
+    },
+    [chave, descartarRascunho]
+  );
+
+  // Salva o rascunho um instante depois que a pessoa para de digitar
+  useEffect(() => {
+    if (!plano || !original || publicado.current) return undefined;
+    const temporizador = setTimeout(() => {
+      if (publicado.current) return;
+      if (JSON.stringify(plano) === JSON.stringify(original)) {
+        apagarRascunho(chave);
+        setRascunhoSalvoEm(null);
+      } else {
+        setRascunhoSalvoEm(gravarRascunho(chave, plano));
+      }
+    }, 600);
+    return () => clearTimeout(temporizador);
+  }, [plano, original, chave]);
+
+  useEffect(() => {
+    if (id) return;
+    comecar({ ...PLANO_VAZIO, autor: usuario?.principal ? "" : usuario?.nome || "" });
+    // Só ao abrir o formulário (o nome da conta não muda enquanto ele está aberto)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -113,7 +199,7 @@ function FormPlano() {
           navigate(`/plano/${id}`, { replace: true });
           return;
         }
-        setPlano({
+        comecar({
           ...PLANO_VAZIO,
           ...Object.fromEntries(Object.keys(PLANO_VAZIO).map((campo) => [campo, data[campo] ?? PLANO_VAZIO[campo]])),
           duracao: data.duracao || "",
@@ -124,7 +210,7 @@ function FormPlano() {
         toast.error("Não foi possível carregar o plano de aula.");
         navigate("/planos");
       });
-  }, [id, podeEditar, navigate]);
+  }, [id, podeEditar, navigate, comecar]);
 
   if (!plano) {
     return (
@@ -143,6 +229,8 @@ function FormPlano() {
     setEnviando(true);
     try {
       const { data } = id ? await axios.put(`/planos/${id}`, plano) : await axios.post("/planos", plano);
+      publicado.current = true;
+      apagarRascunho(chave);
       toast.success(id ? "Plano de aula atualizado." : "Plano de aula publicado!");
       navigate(`/plano/${data._id}`);
     } catch (error) {
@@ -284,6 +372,14 @@ function FormPlano() {
         </section>
 
         <div className="form__submit">
+          {rascunhoSalvoEm && (
+            <p className="rascunho-status" aria-live="polite">
+              Rascunho salvo neste aparelho {quandoFoiSalvo(rascunhoSalvoEm)}
+              <button type="button" className="rascunho-status__descartar" onClick={() => descartarRascunho(original)}>
+                Descartar
+              </button>
+            </p>
+          )}
           <button type="submit" className="btn btn--primary btn--lg" disabled={enviando}>
             {enviando ? "Salvando…" : id ? "Salvar alterações" : "Publicar plano de aula"}
           </button>

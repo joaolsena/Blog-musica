@@ -18,6 +18,7 @@ function Footer() {
             <Link to="/planos">Planos de aula</Link>
             <Link to="/forum">Fórum</Link>
             <Link to="/Ensine-Musica">Sobre</Link>
+            <Link to="/privacidade">Privacidade</Link>
             <BotaoInstalar variante="link" />
           </nav>
         </div>

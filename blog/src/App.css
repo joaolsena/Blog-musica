@@ -2058,6 +2058,29 @@
   color: var(--ink-2);
 }
 
+.privacidade__data {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.privacidade section {
+  display: grid;
+  gap: 0.75em;
+}
+
+.privacidade h2 {
+  font-size: clamp(1.5rem, 2.4vw, 1.875rem);
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.privacidade__destaque {
+  padding: 20px 24px;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--accent-soft);
+}
+
 .sobre__lead {
   font-family: var(--font-display);
   font-size: clamp(1.5rem, 2.6vw, 2rem);

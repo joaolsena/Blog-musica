@@ -15,5 +15,8 @@
         "express": "^4.21.2",
         "mongoose": "^8.9.4",
         "multer": "^2.4.0"
+    },
+    "devDependencies": {
+        "mongodb-memory-server-core": "^11.3.0"
     }
 }

@@ -1,0 +1,55 @@
+# Testes automáticos: rodam a cada push e em cada pull request.
+# Se algo quebrar, o GitHub mostra um X vermelho no commit e avisa por e-mail.
+# O Vercel publica do mesmo jeito, então vale olhar a aba Actions depois de cada push.
+
+name: Testes
+
+on:
+  push:
+    branches-ignore: [backups]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  site:
+    name: Site (lint, testes e build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: blog
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: blog/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  servidor:
+    name: Servidor (testes com banco de teste)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      # O MongoDB dos testes (uns 80 MB) fica guardado entre as execuções
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
+      - run: npm ci
+      - run: npm test

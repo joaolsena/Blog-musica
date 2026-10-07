@@ -3,12 +3,14 @@
 //
 // - Páginas: busca na rede; sem conexão, usa a última versão guardada.
 // - Arquivos do site (/assets, com nome que muda a cada versão): guardados na primeira vez.
-// - Lista e projetos (/api/projetos): busca na rede; sem conexão, usa a última resposta.
+// Os dados (projetos, planos, fórum, comentários) não passam por aqui: o próprio site guarda
+// a última versão no aparelho (memoria.js) e avisa "Sem conexão" com o horário dela. Se o
+// service worker também respondesse com a cópia guardada, o site acharia que veio do
+// servidor e mostraria "Tudo atualizado" mesmo sem internet.
 // As imagens do Cloudinary não são guardadas: o navegador já faz o cache delas.
 
-const VERSAO = "v2";
+const VERSAO = "v3";
 const CACHE_APP = `ensine-musica-app-${VERSAO}`;
-const CACHE_DADOS = `ensine-musica-dados-${VERSAO}`;
 
 // Na instalação, guarda a página base e os arquivos que ela carrega
 self.addEventListener("install", (evento) => {
@@ -29,7 +31,7 @@ self.addEventListener("install", (evento) => {
 self.addEventListener("activate", (evento) => {
   evento.waitUntil(
     (async () => {
-      const atuais = [CACHE_APP, CACHE_DADOS];
+      const atuais = [CACHE_APP];
       const nomes = await caches.keys();
       await Promise.all(nomes.filter((n) => n.startsWith("ensine-musica-") && !atuais.includes(n)).map((n) => caches.delete(n)));
       await self.clients.claim();
@@ -82,7 +84,5 @@ self.addEventListener("fetch", (evento) => {
     evento.respondWith(url.pathname === "/" ? primeiroRede(request, CACHE_APP, "/") : paginaOuBase(request));
   } else if (url.pathname.startsWith("/assets/")) {
     evento.respondWith(primeiroCache(request, CACHE_APP));
-  } else if (url.pathname.startsWith("/api/projetos")) {
-    evento.respondWith(primeiroRede(request, CACHE_DADOS));
   }
 });

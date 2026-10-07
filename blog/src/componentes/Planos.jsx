@@ -3,6 +3,8 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import RevealOnScroll from "./RevealOnScroll";
+import { MEMORIA, guardar, lerGuardado } from "./memoria";
+import { AvisoSincronia, useSincronia } from "./Sincronia";
 import { DURACOES, FAIXAS_ETARIAS, linhas } from "./tipos";
 
 // "Fundamental I · 2 aulas"
@@ -46,18 +48,29 @@ function CartaoPlano({ plano }) {
 
 function Planos() {
   const { isAuthenticated } = useAuth();
-  const [planos, setPlanos] = useState(null);
+  // A última lista vista neste aparelho aparece na hora; a do servidor chega depois
+  const [salvos] = useState(() => lerGuardado(MEMORIA.planos));
+  const [planos, setPlanos] = useState(salvos?.dados ?? null);
+  const [salvoEm, setSalvoEm] = useState(salvos?.salvoEm);
   const [erro, setErro] = useState(false);
   const [busca, setBusca] = useState("");
   const [faixa, setFaixa] = useState("");
+  const sincronia = useSincronia();
+  const { iniciar, concluir } = sincronia;
 
   const carregar = useCallback(() => {
     setErro(false);
+    if (salvos) iniciar();
     axios
       .get("/planos", { timeout: 15000 })
-      .then(({ data }) => setPlanos(data))
-      .catch(() => setErro(true));
-  }, []);
+      .then(({ data }) => {
+        setPlanos(data);
+        guardar(MEMORIA.planos, data);
+        setSalvoEm(Date.now());
+        if (salvos) concluir(true);
+      })
+      .catch(() => (salvos ? concluir(false) : setErro(true)));
+  }, [salvos, iniciar, concluir]);
 
   useEffect(() => {
     document.title = "Planos de aula — Ensine Música";
@@ -78,6 +91,7 @@ function Planos() {
 
   return (
     <div className="container pagina-lista">
+      <AvisoSincronia estado={sincronia.estado} salvoEm={salvoEm} aoTentarDeNovo={carregar} />
       <header className="pagina-lista__head">
         <p className="eyebrow">Para a sua próxima aula</p>
         <h1 className="pagina-lista__titulo">Planos de aula</h1>

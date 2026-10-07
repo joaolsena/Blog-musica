@@ -16,6 +16,20 @@ import {
   mensagemDoErro,
   quando,
 } from "./comunidade";
+import { MEMORIA, guardarItem, lerItemGuardado } from "./memoria";
+
+// Lembrete embaixo dos formulários do público (comentários, respostas e tópicos)
+export function AvisoParticipacao({ aprovacao }) {
+  return (
+    <p className="participar__aviso">
+      Não escreva telefone, endereço nem dados de alunos.
+      {aprovacao && " As mensagens aparecem depois de aprovadas por um professor."}{" "}
+      <Link to="/privacidade" className="link">
+        Privacidade
+      </Link>
+    </p>
+  );
+}
 
 // Um comentário (ou resposta do fórum)
 export function Mensagem({ mensagem, pendente = false, onApagar }) {
@@ -95,7 +109,7 @@ function Comentarios({ tipo, alvo, titulo = "Comentários", textoVazio, rotuloEn
   const pendentesModeracao = useContagemModeracao();
   const lugar = `${tipo}:${alvo}`;
   const idCampo = useId();
-  const [comentarios, setComentarios] = useState(null);
+  const [comentarios, setComentarios] = useState(() => lerItemGuardado(MEMORIA.comentarios, lugar)?.dados ?? null);
   const [erro, setErro] = useState(false);
   const [meusPendentes, setMeusPendentes] = useState(() => lerPendentes(lugar));
   const [nome, setNome] = useState(lerNomeVisitante);
@@ -110,10 +124,12 @@ function Comentarios({ tipo, alvo, titulo = "Comentários", textoVazio, rotuloEn
       .get("/comentarios", { params: { tipo, alvo } })
       .then(({ data }) => {
         setComentarios(data);
+        guardarItem(MEMORIA.comentarios, lugar, data);
         esquecerPendentes(data.map((c) => c._id));
         setMeusPendentes(lerPendentes(lugar));
       })
-      .catch(() => setErro(true));
+      // Sem internet, mas com os comentários guardados: segue mostrando eles, sem aviso de erro
+      .catch(() => setErro(!lerItemGuardado(MEMORIA.comentarios, lugar)));
   }, [tipo, alvo, lugar]);
 
   useEffect(() => {
@@ -229,9 +245,7 @@ function Comentarios({ tipo, alvo, titulo = "Comentários", textoVazio, rotuloEn
           </div>
           <CampoArmadilha valor={armadilha} onChange={setArmadilha} />
           <div className="participar__rodape">
-            {!isAuthenticated && (
-              <p className="participar__aviso">Para manter o espaço seguro, as mensagens aparecem depois de aprovadas.</p>
-            )}
+            <AvisoParticipacao aprovacao={!isAuthenticated} />
             <button type="submit" className="btn btn--primary" disabled={enviando}>
               {enviando ? "Enviando…" : rotuloEnviar}
             </button>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -9,6 +9,8 @@ import { iniciais } from "./MenuConta";
 import NaoEncontrado from "./NaoEncontrado";
 import { mensagemDoErro, quando } from "./comunidade";
 import { rotuloCategoria } from "./tipos";
+import { MEMORIA, esquecerItem, guardarItem, lerItemGuardado } from "./memoria";
+import { AvisoSincronia, useSincronia } from "./Sincronia";
 
 function VoltarForum() {
   return (
@@ -25,15 +27,39 @@ function TopicoForum() {
   const { id } = useParams();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [topico, setTopico] = useState(null);
+  // Já aberto neste aparelho: aparece na hora; o servidor atualiza depois
+  const [salvo] = useState(() => lerItemGuardado(MEMORIA.topicosAbertos, id));
+  const [topico, setTopico] = useState(salvo?.dados ?? null);
+  const [salvoEm, setSalvoEm] = useState(salvo?.salvoEm);
   const [erro, setErro] = useState(null);
+  const sincronia = useSincronia();
+  const { iniciar, concluir } = sincronia;
 
-  useEffect(() => {
+  const buscar = useCallback(() => {
+    if (salvo) iniciar();
     axios
       .get(`/forum/${id}`, { timeout: 15000 })
-      .then(({ data }) => setTopico(data))
-      .catch((error) => setErro(error.response?.status === 404 ? "nao-encontrado" : "falha"));
-  }, [id]);
+      .then(({ data }) => {
+        setTopico(data);
+        guardarItem(MEMORIA.topicosAbertos, id, data);
+        setSalvoEm(Date.now());
+        if (salvo) concluir(true);
+      })
+      .catch((error) => {
+        if (error.response?.status === 404) {
+          esquecerItem(MEMORIA.topicosAbertos, id);
+          setErro("nao-encontrado");
+        } else if (salvo) {
+          concluir(false);
+        } else {
+          setErro("falha");
+        }
+      });
+  }, [id, salvo, iniciar, concluir]);
+
+  useEffect(() => {
+    buscar();
+  }, [buscar]);
 
   useEffect(() => {
     if (!topico) return undefined;
@@ -48,6 +74,7 @@ function TopicoForum() {
     if (!window.confirm("Apagar este tópico e todas as respostas? Esta ação não pode ser desfeita.")) return;
     try {
       await axios.delete(`/forum/${id}`);
+      esquecerItem(MEMORIA.topicosAbertos, id);
       toast.success("Tópico apagado.");
       navigate("/forum");
     } catch (error) {
@@ -84,6 +111,7 @@ function TopicoForum() {
 
   return (
     <article className="container topico">
+      <AvisoSincronia estado={sincronia.estado} salvoEm={salvoEm} aoTentarDeNovo={buscar} />
       <header className="topico__head">
         <VoltarForum />
         <span className="topico-linha__categoria">{rotuloCategoria(topico.categoria)}</span>

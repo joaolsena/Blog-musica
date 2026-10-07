@@ -23,6 +23,7 @@ import FormPlano from "./componentes/FormPlano"; // Escrever ou editar um plano 
 import Forum from "./componentes/Forum"; // Fórum: lista de tópicos
 import TopicoForum from "./componentes/TopicoForum"; // Um tópico do fórum com as respostas
 import Moderacao from "./componentes/Moderacao"; // Aprovar comentários e tópicos de visitantes
+import Privacidade from "./componentes/Privacidade"; // O que o site guarda e por quê
 import LoginPage from "./componentes/Login"; // Tela de login
 import { AuthProvider } from "./componentes/AuthContext"; // Provedor do contexto de autenticação
 import PrivateRoute from "./componentes/PrivateRoute"; // Componente para proteger rotas privadas
@@ -82,6 +83,9 @@ function Paginas() {
             </PrivateRoute>
           }
         />
+
+        {/* Privacidade (LGPD) */}
+        <Route path="/privacidade" element={<Privacidade />} />
 
         {/* Página sobre o Ensine Música */}
         <Route path="/Ensine-Musica" element={<EnsineMusica />} />

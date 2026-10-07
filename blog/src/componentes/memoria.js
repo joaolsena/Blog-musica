@@ -59,3 +59,55 @@ export function quandoFoiSalvo(salvoEm, agora = new Date()) {
   }
   return `em ${new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short" }).format(data)}`;
 }
+
+// **Planos de aula, fórum e comentários** guardados do mesmo jeito: a última versão vista
+// aparece na hora (e sem internet) enquanto o servidor responde.
+
+// Uma lista inteira (planos, tópicos do fórum): { dados, salvoEm } ou null
+export function lerGuardado(chave) {
+  try {
+    const guardado = JSON.parse(localStorage.getItem(chave));
+    return guardado && guardado.dados !== undefined ? guardado : null;
+  } catch {
+    return null;
+  }
+}
+
+export function guardar(chave, dados) {
+  try {
+    localStorage.setItem(chave, JSON.stringify({ dados, salvoEm: Date.now() }));
+  } catch {
+    // sem espaço ou sem armazenamento: segue sem guardar
+  }
+}
+
+// Itens abertos um a um (um plano, um tópico, os comentários de uma página). Guarda só os
+// mais recentes, para não encher o armazenamento do aparelho.
+const LIMITE_ITENS = 30;
+
+export function lerItemGuardado(chave, id) {
+  const item = lerGuardado(chave)?.dados?.[id];
+  return item ? { dados: item.dados, salvoEm: item.salvoEm } : null;
+}
+
+export function guardarItem(chave, id, dados) {
+  const itens = { ...(lerGuardado(chave)?.dados || {}), [id]: { dados, salvoEm: Date.now() } };
+  const recentes = Object.entries(itens)
+    .sort(([, a], [, b]) => b.salvoEm - a.salvoEm)
+    .slice(0, LIMITE_ITENS);
+  guardar(chave, Object.fromEntries(recentes));
+}
+
+export function esquecerItem(chave, id) {
+  const itens = lerGuardado(chave)?.dados;
+  if (!itens?.[id]) return;
+  guardar(chave, Object.fromEntries(Object.entries(itens).filter(([chaveItem]) => chaveItem !== id)));
+}
+
+export const MEMORIA = {
+  planos: "ensine-musica:planos",
+  planosAbertos: "ensine-musica:planos-abertos",
+  forum: "ensine-musica:forum",
+  topicosAbertos: "ensine-musica:topicos-abertos",
+  comentarios: "ensine-musica:comentarios",
+};

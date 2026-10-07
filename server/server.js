@@ -5,11 +5,27 @@ const cloudinary = require("cloudinary").v2;
 const multer = require("multer");
 const crypto = require("crypto");
 require("dotenv").config();
+const { criarLimite } = require("./limites");
 
 const app = express();
 
 // Em produção o servidor fica atrás de um proxy; isso faz req.ip ser o IP real do visitante
 app.set("trust proxy", 1);
+
+// Cabeçalhos de segurança (os mesmos do vercel.json, para valerem também fora do Vercel):
+// ninguém exibe o site dentro de outro (golpe de clique escondido), o navegador não
+// "adivinha" o tipo dos arquivos e outros sites não recebem o endereço completo das páginas.
+app.disable("x-powered-by");
+app.use((req, res, next) => {
+  res.set({
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "frame-ancestors 'none'",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  });
+  next();
+});
 
 // **Middleware**
 // CORS_ORIGIN (opcional): endereços do site separados por vírgula, ex.:
@@ -157,29 +173,32 @@ const gerarSenhaTemporaria = () => {
 
 const TAMANHO_MINIMO_SENHA = 8;
 
-// Limite de tentativas de login por IP: 5 erros a cada 15 minutos
-const LIMITE_TENTATIVAS = 5;
+// Limite de senhas erradas (guardado no banco, veja limites.js): 5 por IP a cada 15 minutos
+// e 10 por conta, para quem tenta uma mesma conta trocando de IP. Bloqueado, nem a senha
+// certa entra até a janela acabar.
 const JANELA_TENTATIVAS_MS = 15 * 60 * 1000;
-const tentativasPorIp = new Map();
+const limiteLoginPorIp = criarLimite("login-ip", { maximo: 5, janelaMs: JANELA_TENTATIVAS_MS });
+const limiteLoginPorConta = criarLimite("login-conta", { maximo: 10, janelaMs: JANELA_TENTATIVAS_MS });
 
 api.post("/auth/login", async (req, res) => {
   if (!autenticacaoConfigurada) {
     return res.status(503).send("Autenticação não configurada no servidor");
   }
 
-  const agora = Date.now();
-  const registro = tentativasPorIp.get(req.ip);
-  if (registro && registro.reiniciaEm > agora && registro.erros >= LIMITE_TENTATIVAS) {
-    res.set("Retry-After", Math.ceil((registro.reiniciaEm - agora) / 1000));
+  const senha = req.body?.senha;
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+
+  const espera = Math.max(
+    await limiteLoginPorIp.espera(req.ip),
+    email ? await limiteLoginPorConta.espera(email) : 0
+  );
+  if (espera) {
+    res.set("Retry-After", espera);
     return res.status(429).send("Muitas tentativas. Tente novamente mais tarde.");
   }
 
-  const senha = req.body?.senha;
-  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
-  const errou = () => {
-    const atual = registro && registro.reiniciaEm > agora ? registro : { erros: 0, reiniciaEm: agora + JANELA_TENTATIVAS_MS };
-    atual.erros += 1;
-    tentativasPorIp.set(req.ip, atual);
+  const errou = async () => {
+    await Promise.all([limiteLoginPorIp.contar(req.ip), email && limiteLoginPorConta.contar(email)]);
     res.status(401).send(email ? "E-mail ou senha incorretos" : "Senha incorreta");
   };
   if (typeof senha !== "string" || !senha) return errou();
@@ -188,7 +207,7 @@ api.post("/auth/login", async (req, res) => {
   if (!email) {
     if (!senhaPrincipalAtiva) return res.status(400).send("Informe o seu e-mail.");
     if (!iguais(senha, ADMIN_PASSWORD)) return errou();
-    tentativasPorIp.delete(req.ip);
+    await limiteLoginPorIp.zerar(req.ip);
     return res.json({ ...criarToken(), usuario: CONTA_PRINCIPAL });
   }
 
@@ -196,7 +215,7 @@ api.post("/auth/login", async (req, res) => {
   try {
     const conta = await Usuario.findOne({ email }).lean();
     if (!conta || !conta.ativo || !senhaConfere(senha, conta.senhaHash)) return errou();
-    tentativasPorIp.delete(req.ip);
+    await Promise.all([limiteLoginPorIp.zerar(req.ip), limiteLoginPorConta.zerar(email)]);
     res.json({
       ...criarToken(String(conta._id)),
       usuario: { id: String(conta._id), nome: conta.nome, email: conta.email, papel: conta.papel, trocarSenha: conta.trocarSenha },
@@ -206,12 +225,6 @@ api.post("/auth/login", async (req, res) => {
     res.status(500).send("Erro ao entrar");
   }
 });
-
-// Limpa registros de tentativas vencidos, para o mapa não crescer para sempre
-setInterval(() => {
-  const agora = Date.now();
-  tentativasPorIp.forEach((registro, ip) => registro.reiniciaEm <= agora && tentativasPorIp.delete(ip));
-}, JANELA_TENTATIVAS_MS).unref();
 
 // **Conexão com o MongoDB**
 // (nos testes automáticos MONGO_URI fica vazia e o servidor não se conecta ao banco)
@@ -921,6 +934,7 @@ app.get("/sitemap.xml", async (req, res) => {
       url("/planos"),
       url("/forum"),
       url("/Ensine-Musica"),
+      url("/privacidade"),
       ...projetos.map((p) => url(`/projeto/${p._id}`, dataISO(p.data))),
       ...planos.map((p) => url(`/plano/${p._id}`, dia(p.updatedAt))),
       ...topicos.map((t) => url(`/forum/${t._id}`, dia(t.ultimaAtividade))),

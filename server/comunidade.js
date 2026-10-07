@@ -4,6 +4,7 @@
 // Professores logados publicam na hora, com o selo "Professor".
 // O servidor não guarda e-mail nem IP de quem comenta.
 const mongoose = require("mongoose");
+const { criarLimite } = require("./limites");
 
 const CATEGORIAS = ["duvidas", "ideias", "relatos", "materiais"];
 const TIPOS_ALVO = ["projeto", "plano", "topico"];
@@ -89,35 +90,23 @@ const topicoPublico = (t, { completo = true } = {}) => ({
   ultimaAtividade: t.ultimaAtividade,
 });
 
-// Contra spam de visitantes: campo escondido que só robôs preenchem e limite por IP
-// (5 envios a cada 10 minutos). O IP fica só na memória, nunca no banco.
-const LIMITE_ENVIOS = 5;
-const JANELA_ENVIOS_MS = 10 * 60 * 1000;
-const enviosPorIp = new Map();
-
-setInterval(() => {
-  const agora = Date.now();
-  enviosPorIp.forEach((registro, ip) => registro.reiniciaEm <= agora && enviosPorIp.delete(ip));
-}, JANELA_ENVIOS_MS).unref();
+// Contra spam de visitantes: campo escondido que só robôs preenchem e no máximo 5 envios
+// a cada 10 minutos por IP (contados no banco, veja limites.js; o IP não é guardado).
+const limiteEnvios = criarLimite("envio-publico", { maximo: 5, janelaMs: 10 * 60 * 1000 });
 
 // Devolve true se o envio pode seguir; senão, já respondeu
-function liberarEnvio(req, res) {
+async function liberarEnvio(req, res) {
   if (req.usuario) return true;
   if (req.body?.site) {
     // Robô: finge que deu certo, mas não salva nada
     res.status(202).json({ status: "pendente" });
     return false;
   }
-  const agora = Date.now();
-  const registro = enviosPorIp.get(req.ip);
-  const atual = registro && registro.reiniciaEm > agora ? registro : { envios: 0, reiniciaEm: agora + JANELA_ENVIOS_MS };
-  if (atual.envios >= LIMITE_ENVIOS) {
-    res.set("Retry-After", Math.ceil((atual.reiniciaEm - agora) / 1000));
+  if ((await limiteEnvios.contar(req.ip)) > limiteEnvios.maximo) {
+    res.set("Retry-After", await limiteEnvios.espera(req.ip));
     res.status(429).send("Você enviou muitas mensagens seguidas. Espere alguns minutos e tente de novo.");
     return false;
   }
-  atual.envios += 1;
-  enviosPorIp.set(req.ip, atual);
   return true;
 }
 
@@ -169,7 +158,7 @@ function registrarComunidade(api, { exigirLogin, identificar, modelos }) {
     const erro =
       (!req.usuario && conferirTamanho(nome, LIMITES.nome, "O nome")) || conferirTamanho(texto, LIMITES.comentario, "O comentário");
     if (erro) return res.status(400).send(erro);
-    if (!liberarEnvio(req, res)) return;
+    if (!(await liberarEnvio(req, res))) return;
     try {
       if (!(await alvoExiste(tipo, alvo))) return res.status(404).send("Não encontramos onde publicar este comentário.");
       const comentario = await Comentario.create({
@@ -242,7 +231,7 @@ function registrarComunidade(api, { exigirLogin, identificar, modelos }) {
       conferirTamanho(texto, LIMITES.textoTopico, "O texto") ||
       (!CATEGORIAS.includes(categoria) && "Escolha uma categoria.");
     if (erro) return res.status(400).send(erro);
-    if (!liberarEnvio(req, res)) return;
+    if (!(await liberarEnvio(req, res))) return;
     try {
       const topico = await Topico.create({
         titulo,

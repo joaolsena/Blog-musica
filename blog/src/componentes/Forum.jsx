@@ -3,7 +3,7 @@ import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "./AuthContext";
-import { CampoArmadilha, CampoNome } from "./Comentarios";
+import { AvisoParticipacao, CampoArmadilha, CampoNome } from "./Comentarios";
 import {
   LIMITE_TEXTO_TOPICO,
   LIMITE_TITULO_TOPICO,
@@ -16,6 +16,8 @@ import {
   quando,
 } from "./comunidade";
 import { CATEGORIAS_FORUM, rotuloCategoria } from "./tipos";
+import { MEMORIA, guardar, lerGuardado } from "./memoria";
+import { AvisoSincronia, useSincronia } from "./Sincronia";
 
 // Formulário de novo tópico (abre embaixo do botão "Novo tópico")
 function NovoTopico({ onFechar, onEnviado }) {
@@ -110,9 +112,7 @@ function NovoTopico({ onFechar, onEnviado }) {
       </div>
       <CampoArmadilha valor={armadilha} onChange={setArmadilha} />
       <div className="participar__rodape">
-        {!isAuthenticated && (
-          <p className="participar__aviso">Para manter o espaço seguro, os tópicos aparecem depois de aprovados.</p>
-        )}
+        <AvisoParticipacao aprovacao={!isAuthenticated} />
         <button type="submit" className="btn btn--primary" disabled={enviando}>
           {enviando ? "Publicando…" : "Publicar tópico"}
         </button>
@@ -153,8 +153,13 @@ function LinhaTopico({ topico, pendente = false }) {
 }
 
 function Forum() {
-  const [topicos, setTopicos] = useState(null);
+  // A última lista vista neste aparelho aparece na hora; a do servidor chega depois
+  const [salvos] = useState(() => lerGuardado(MEMORIA.forum));
+  const [topicos, setTopicos] = useState(salvos?.dados ?? null);
+  const [salvoEm, setSalvoEm] = useState(salvos?.salvoEm);
   const [erro, setErro] = useState(false);
+  const sincronia = useSincronia();
+  const { iniciar, concluir } = sincronia;
   const [categoria, setCategoria] = useState("");
   const [busca, setBusca] = useState("");
   const [escrevendo, setEscrevendo] = useState(false);
@@ -163,15 +168,19 @@ function Forum() {
 
   const carregar = useCallback(() => {
     setErro(false);
+    if (salvos) iniciar();
     axios
       .get("/forum", { timeout: 15000 })
       .then(({ data }) => {
         setTopicos(data);
+        guardar(MEMORIA.forum, data);
+        setSalvoEm(Date.now());
         esquecerPendentes(data.map((t) => t._id));
         setMeusPendentes(lerPendentes("forum"));
+        if (salvos) concluir(true);
       })
-      .catch(() => setErro(true));
-  }, []);
+      .catch(() => (salvos ? concluir(false) : setErro(true)));
+  }, [salvos, iniciar, concluir]);
 
   useEffect(() => {
     document.title = "Fórum — Ensine Música";
@@ -195,6 +204,7 @@ function Forum() {
 
   return (
     <div className="container pagina-lista">
+      <AvisoSincronia estado={sincronia.estado} salvoEm={salvoEm} aoTentarDeNovo={carregar} />
       <header className="pagina-lista__head">
         <p className="eyebrow">Comunidade</p>
         <h1 className="pagina-lista__titulo">Fórum</h1>

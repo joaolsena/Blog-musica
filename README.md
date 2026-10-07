@@ -9,19 +9,21 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 - Lista de projetos com busca e filtro por tipo (instrumento ou jogo)
 - **Planos de aula**: escritos pelos professores com conta, com objetivos, materiais, etapas da aula, avaliação, dicas e links para os projetos usados. Filtro por turma, busca, PDF e comentários
 - **Fórum** com categorias (Dúvidas, Ideias e adaptações, Relatos de sala de aula, Materiais), busca e respostas
-- **Comentários** em cada projeto e plano de aula. Visitantes participam só com o nome, sem cadastro; a mensagem aparece depois que alguém com conta aprova na página **Moderação** (o número de mensagens esperando aparece no menu da conta). Professores logados publicam na hora, com o selo "Professor". Proteção contra spam: campo escondido para robôs e no máximo 5 envios a cada 10 minutos por visitante. O servidor não guarda e-mail nem IP de quem comenta
+- **Comentários** em cada projeto e plano de aula. Visitantes participam só com o nome, sem cadastro; a mensagem aparece depois que alguém com conta aprova na página **Moderação** (o número de mensagens esperando aparece no menu da conta). Professores logados publicam na hora, com o selo "Professor". Proteção contra spam: campo escondido para robôs e no máximo 5 envios a cada 10 minutos por visitante. O servidor não guarda e-mail nem IP de quem comenta (o limite usa só uma marca embaralhada do IP, que o banco apaga sozinho depois de 10 minutos)
 - Página de cada projeto: materiais, passo a passo com até 20 fotos, vídeos (link do YouTube ou arquivo enviado), instruções de uso e aplicação didática
 - Ficha de cada projeto (para quem é, nível e duração) e filtros por turma, nível e duração na página inicial
 - Botão "Baixar PDF" em cada projeto: arquivo pronto para imprimir, com capa, ficha, materiais em lista para marcar, fotos do passo a passo com legendas e links dos vídeos. Os textos longos saem justificados; as referências, alinhadas à esquerda. O PDF é gerado no próprio navegador, com as fontes do site (`blog/src/assets/fontes`, licença OFL)
 - Prévia própria de cada projeto ao compartilhar o link (título, descrição e foto no WhatsApp, Facebook etc.) e sitemap para o Google
-- Rascunho automático ao cadastrar um projeto: textos, fotos e vídeos voltam se a página recarregar
+- Rascunho automático ao cadastrar um projeto (textos, fotos e vídeos) e ao escrever ou editar um plano de aula: o que foi digitado volta se a página recarregar ou o login vencer
+- Segurança: limite de senhas erradas (5 por aparelho e 10 por conta a cada 15 minutos) contado no banco, para valer em todas as cópias do servidor no Vercel; cabeçalhos que impedem outro site de exibir o Ensine Música dentro dele
 - Backup: botão para baixar e restaurar tudo (projetos, planos de aula, fórum e comentários) e cópia automática dos projetos e planos toda segunda-feira no GitHub (branch `backups`)
 - Botão de compartilhar: menu nativo do celular (WhatsApp, Instagram etc.) ou, no computador, WhatsApp, Telegram, Facebook, e-mail e "copiar link"
 - Contas individuais: **administradores** (tudo, inclusive contas e backup) e **autores** (publicam e editam só os próprios projetos). Conta nova recebe senha temporária e cria a própria no primeiro acesso. A senha principal (`ADMIN_PASSWORD`, com o e-mail em branco no login) continua valendo como chave reserva
 - Legenda em cada foto do passo a passo (aparece embaixo da foto, na tela cheia e para leitores de tela)
 - Modo claro e escuro, layout para computador e celular
 - Instalável como app (iPhone, iPad, Android, Mac e Windows): botão discreto no cabeçalho e no rodapé. No Chrome e no Edge abre a janela de instalação do sistema; no Safari e nos outros, mostra o passo a passo. Depois de instalado, abre sem internet o que já foi visto
-- Projetos guardados no aparelho: a última versão vista aparece na hora, com o aviso "Sincronizando…" enquanto o servidor responde (e "Sem conexão" com o horário da versão mostrada, se não houver internet)
+- Projetos, planos de aula, fórum e comentários guardados no aparelho: a última versão vista aparece na hora, com o aviso "Sincronizando…" enquanto o servidor responde (e "Sem conexão" com o horário da versão mostrada, se não houver internet)
+- Página de **Privacidade** (LGPD) no rodapé, explicando o que o site guarda e onde, e lembrete nos formulários do público para não escrever dados de alunos
 
 ## Tecnologias
 
@@ -49,6 +51,7 @@ server/
   server.js            API (rotas em /api), contas, projetos, backup e prévias de links
   planos.js            planos de aula
   comunidade.js        comentários, fórum e moderação
+  limites.js           limites de tentativas (login e envios do público), guardados no banco
   server.test.js       testes da API
   .env.example         modelo das variáveis de ambiente
 api/index.js           entrada do servidor no Vercel (usa server/server.js)
@@ -114,11 +117,13 @@ As variáveis `VITE_*` são embutidas no site durante a compilação: depois de 
 ## Testes
 
 ```bash
-cd blog && npm test       # site: componentes, filtros, busca, 404, login
-cd server && npm test     # servidor: login, permissões, limites de envio de imagens
+cd blog && npm test       # site: componentes, filtros, busca, 404, login, comentários, fórum, planos
+cd server && npm test     # servidor: login, permissões, limites, planos, comentários, fórum, backup
 ```
 
-Os testes não acessam o banco de dados nem o Cloudinary.
+Os testes do servidor usam um MongoDB temporário, criado na memória só para eles (`server/integracao.test.js`; na primeira vez ele baixa o MongoDB, uns 80 MB). Nenhum teste acessa o banco de verdade nem o Cloudinary.
+
+**Testes automáticos:** `.github/workflows/testes.yml` roda lint, testes e build do site e os testes do servidor a cada push. Se algo quebrar, o commit ganha um X vermelho no GitHub e chega um e-mail. O Vercel publica mesmo assim, então vale conferir a aba Actions depois de cada push.
 
 ## Publicação
 

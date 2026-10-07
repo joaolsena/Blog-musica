@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -9,6 +9,8 @@ import { BotaoCompartilhar } from "./Compartilhar";
 import NaoEncontrado from "./NaoEncontrado";
 import { urlImagem } from "./imagens";
 import { mensagemDoErro } from "./comunidade";
+import { MEMORIA, esquecerItem, guardarItem, lerGuardado, lerItemGuardado } from "./memoria";
+import { AvisoSincronia, useSincronia } from "./Sincronia";
 import { resumoDoPlano } from "./Planos";
 import { linhas, rotuloTipo } from "./tipos";
 
@@ -51,16 +53,46 @@ function PlanoDetalhes() {
   const { id } = useParams();
   const { podeEditar } = useAuth();
   const navigate = useNavigate();
-  const [plano, setPlano] = useState(null);
+  // Já aberto (ou visto na lista) neste aparelho: aparece na hora; o servidor atualiza depois
+  const [salvo] = useState(() => {
+    const aberto = lerItemGuardado(MEMORIA.planosAbertos, id);
+    if (aberto) return aberto;
+    const lista = lerGuardado(MEMORIA.planos);
+    const daLista = lista?.dados?.find((p) => p._id === id);
+    return daLista ? { dados: daLista, salvoEm: lista.salvoEm } : null;
+  });
+  const [plano, setPlano] = useState(salvo?.dados ?? null);
+  const [salvoEm, setSalvoEm] = useState(salvo?.salvoEm);
   const [erro, setErro] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
+  const sincronia = useSincronia();
+  const { iniciar, concluir } = sincronia;
 
-  useEffect(() => {
+  const buscar = useCallback(() => {
+    if (salvo) iniciar();
     axios
       .get(`/planos/${id}`, { timeout: 15000 })
-      .then(({ data }) => setPlano(data))
-      .catch((error) => setErro(error.response?.status === 404 ? "nao-encontrado" : "falha"));
-  }, [id]);
+      .then(({ data }) => {
+        setPlano(data);
+        guardarItem(MEMORIA.planosAbertos, id, data);
+        setSalvoEm(Date.now());
+        if (salvo) concluir(true);
+      })
+      .catch((error) => {
+        if (error.response?.status === 404) {
+          esquecerItem(MEMORIA.planosAbertos, id);
+          setErro("nao-encontrado");
+        } else if (salvo) {
+          concluir(false); // sem conexão: continua mostrando a versão guardada
+        } else {
+          setErro("falha");
+        }
+      });
+  }, [id, salvo, iniciar, concluir]);
+
+  useEffect(() => {
+    buscar();
+  }, [buscar]);
 
   useEffect(() => {
     if (!plano) return undefined;
@@ -89,6 +121,7 @@ function PlanoDetalhes() {
     axios
       .delete(`/planos/${id}`)
       .then(() => {
+        esquecerItem(MEMORIA.planosAbertos, id);
         toast.success("Plano de aula apagado.");
         navigate("/planos");
       })
@@ -133,6 +166,7 @@ function PlanoDetalhes() {
 
   return (
     <article className="container artigo">
+      <AvisoSincronia estado={sincronia.estado} salvoEm={salvoEm} aoTentarDeNovo={buscar} />
       <header className="artigo__head">
         <VoltarPlanos />
         <span className="tag tag--plano">Plano de aula</span>

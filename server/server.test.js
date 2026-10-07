@@ -352,3 +352,11 @@ test("tópico do fórum precisa de título, texto e categoria conhecida", async 
     assert.equal(resposta.status, 400, JSON.stringify(corpo));
   }
 });
+
+test("respostas trazem os cabeçalhos de segurança", async () => {
+  const resposta = await fetch(`${base}/comentarios`);
+  assert.equal(resposta.headers.get("x-frame-options"), "DENY");
+  assert.equal(resposta.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(resposta.headers.get("content-security-policy"), "frame-ancestors 'none'");
+  assert.equal(resposta.headers.get("x-powered-by"), null);
+});
