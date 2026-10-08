@@ -43,3 +43,9 @@ export const rotuloCategoria = (valor) => rotuloDe(CATEGORIAS_FORUM, valor) || "
 
 // Listas dos planos de aula: um item por linha
 export const linhas = (texto) => (texto ? texto.split("\n").map((linha) => linha.trim()).filter(Boolean) : []);
+
+// Turmas e duração de um plano de aula: "Fundamental I · 2 aulas"
+export function resumoDoPlano(plano) {
+  const faixas = FAIXAS_ETARIAS.filter((f) => plano.faixasEtarias?.includes(f.valor)).map((f) => f.curto);
+  return [...faixas, rotuloDe(DURACOES, plano.duracao)].filter(Boolean).join(" · ");
+}

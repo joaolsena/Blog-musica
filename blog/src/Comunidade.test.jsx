@@ -158,3 +158,25 @@ test("página de privacidade: link no rodapé e lembrete nos formulários do pú
   expect(await screen.findByRole("heading", { level: 1, name: "Privacidade" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Alunos e menores de idade" })).toBeInTheDocument();
 });
+
+test("busca única acha projeto, plano e tópico e abre o escolhido", async () => {
+  servidor({
+    "/projetos": [PROJETO],
+    "/planos": [PLANO],
+    "/forum": TOPICOS,
+    "/projetos/1": PROJETO,
+    "/comentarios": [],
+  });
+  abrir("/");
+
+  await userEvent.click(screen.getByRole("button", { name: "Buscar no site" }));
+  const campo = await screen.findByRole("combobox", { name: /Buscar projetos/ });
+  await userEvent.type(campo, "chocalho");
+
+  const resultados = await screen.findByRole("listbox");
+  expect(within(resultados).getByRole("group", { name: "Projetos" })).toBeInTheDocument();
+  expect(within(resultados).getByRole("group", { name: "Planos de aula" })).toBeInTheDocument();
+
+  await userEvent.keyboard("{Enter}");
+  expect(await screen.findByRole("heading", { level: 1, name: "Chocalho de garrafa" })).toBeInTheDocument();
+});

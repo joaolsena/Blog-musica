@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import Logo from "./Logo";
 import { BotaoInstalar } from "./InstalarApp";
+import { BotaoBusca } from "./Busca";
 import MenuConta, { ROTULO_PAPEL, iniciais } from "./MenuConta";
 import { BotaoTema } from "./Tema";
 import { atualizarContagem, useContagemModeracao, zerarContagem } from "./contagemModeracao";
@@ -48,6 +49,8 @@ function Navbar() {
   const { isAuthenticated, ehAdmin, logout, usuario } = useAuth();
   const pendentes = useContagemModeracao();
   const [menuAberto, setMenuAberto] = useState(false);
+  const botaoMenu = useRef(null);
+  const painel = useRef(null);
   const [rolou, setRolou] = useState(false);
   const location = useLocation();
 
@@ -70,13 +73,40 @@ function Navbar() {
     return () => window.removeEventListener("scroll", aoRolar);
   }, []);
 
-  // Com o menu aberto no celular: fecha com Esc
+  // Fecha o menu do celular e devolve o foco ao botão (para quem usa teclado ou leitor de tela)
+  const fecharMenu = useCallback(() => {
+    setMenuAberto(false);
+    botaoMenu.current?.focus({ preventScroll: true });
+  }, []);
+
+  // Com o menu aberto no celular: o foco entra no painel, o Tab circula só entre o botão e
+  // os itens do painel (sem cair na página escurecida atrás) e Esc fecha
   useEffect(() => {
     if (!menuAberto) return undefined;
-    const aoTeclar = (e) => e.key === "Escape" && setMenuAberto(false);
+    const focaveis = () =>
+      [botaoMenu.current, ...painel.current.querySelectorAll("a[href], button:not([disabled])")].filter(
+        (el) => el.getClientRects().length > 0 // só os visíveis
+      );
+    focaveis()[1]?.focus({ preventScroll: true });
+    const aoTeclar = (e) => {
+      if (e.key === "Escape") {
+        fecharMenu();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const lista = focaveis();
+      const atual = lista.indexOf(document.activeElement);
+      if (e.shiftKey && atual <= 0) {
+        e.preventDefault();
+        lista[lista.length - 1].focus();
+      } else if (!e.shiftKey && (atual === -1 || atual === lista.length - 1)) {
+        e.preventDefault();
+        lista[0].focus();
+      }
+    };
     window.addEventListener("keydown", aoTeclar);
     return () => window.removeEventListener("keydown", aoTeclar);
-  }, [menuAberto]);
+  }, [menuAberto, fecharMenu]);
 
   const links = [
     { to: "/", rotulo: "Projetos", end: true, icone: "projetos" },
@@ -143,15 +173,17 @@ function Navbar() {
           </nav>
 
           <div className="header__end">
+            <BotaoBusca />
             <BotaoInstalar />
             <BotaoTema />
             <button
+              ref={botaoMenu}
               type="button"
               className="menu-toggle"
               aria-label={menuAberto ? "Fechar menu" : "Abrir menu"}
               aria-expanded={menuAberto}
               aria-controls="menu-mobile"
-              onClick={() => setMenuAberto((aberto) => !aberto)}
+              onClick={() => (menuAberto ? fecharMenu() : setMenuAberto(true))}
             >
               <span />
               <span />
@@ -165,10 +197,11 @@ function Navbar() {
           se posicionar dentro dele. */}
       <div
         className={`menu-painel__fundo${menuAberto ? " is-open" : ""}`}
-        onClick={() => setMenuAberto(false)}
+        onClick={fecharMenu}
         aria-hidden="true"
       />
       <nav
+        ref={painel}
         id="menu-mobile"
         className={`menu-painel${menuAberto ? " is-open" : ""}`}
         aria-label="Menu"
@@ -184,6 +217,9 @@ function Navbar() {
               </NavLink>
             </li>
           ))}
+          <li className="menu-painel__so-estreito">
+            <BotaoInstalar variante="menu" />
+          </li>
         </ul>
 
         {isAuthenticated ? (

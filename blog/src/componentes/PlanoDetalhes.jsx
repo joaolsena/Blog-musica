@@ -11,8 +11,7 @@ import { urlImagem } from "./imagens";
 import { mensagemDoErro } from "./comunidade";
 import { MEMORIA, esquecerItem, guardarItem, lerGuardado, lerItemGuardado } from "./memoria";
 import { AvisoSincronia, useSincronia } from "./Sincronia";
-import { resumoDoPlano } from "./Planos";
-import { linhas, rotuloTipo } from "./tipos";
+import { linhas, resumoDoPlano, rotuloTipo } from "./tipos";
 
 const ROMANOS = ["I", "II", "III", "IV", "V", "VI", "VII"];
 

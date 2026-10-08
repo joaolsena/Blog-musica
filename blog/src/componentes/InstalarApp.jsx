@@ -205,7 +205,8 @@ function PainelInstalar({ plataforma, aoFechar }) {
   );
 }
 
-// variante "icone": botão redondo do cabeçalho; "link": texto discreto do rodapé
+// variante "icone": botão redondo do cabeçalho; "link": texto discreto do rodapé;
+// "menu": item do menu do celular (só aparece em telas estreitas, onde o ícone não cabe)
 export function BotaoInstalar({ variante = "icone" }) {
   const { temConvite, instalado } = useInstalacao();
   const plataforma = useMemo(() => detectarPlataforma(), []);
@@ -248,6 +249,13 @@ export function BotaoInstalar({ variante = "icone" }) {
           title="Instalar o app"
         >
           <IconeBaixar />
+        </button>
+      ) : variante === "menu" ? (
+        <button ref={botao} type="button" className="menu-painel__link menu-painel__instalar" onClick={instalar}>
+          <span className="menu-painel__icone">
+            <IconeBaixar tamanho={20} />
+          </span>
+          Instalar o app
         </button>
       ) : (
         <button ref={botao} type="button" className="footer__instalar" onClick={instalar}>

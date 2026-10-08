@@ -6,6 +6,7 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 
 ## Funcionalidades
 
+- **Busca única** (lupa no cabeçalho, ou Ctrl+K / ⌘K / "/"): procura ao mesmo tempo em projetos, planos de aula e fórum, ignorando acentos, com o trecho encontrado em destaque; setas e Enter para escolher. Funciona sem internet com o que já foi visto
 - Lista de projetos com busca e filtro por tipo (instrumento ou jogo)
 - **Planos de aula**: escritos pelos professores com conta, com objetivos, materiais, etapas da aula, avaliação, dicas e links para os projetos usados. Filtro por turma, busca, PDF e comentários
 - **Fórum** com categorias (Dúvidas, Ideias e adaptações, Relatos de sala de aula, Materiais), busca e respostas
@@ -20,7 +21,7 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 - Botão de compartilhar: menu nativo do celular (WhatsApp, Instagram etc.) ou, no computador, WhatsApp, Telegram, Facebook, e-mail e "copiar link"
 - Contas individuais: **administradores** (tudo, inclusive contas e backup) e **autores** (publicam e editam só os próprios projetos). Conta nova recebe senha temporária e cria a própria no primeiro acesso. A senha principal (`ADMIN_PASSWORD`, com o e-mail em branco no login) continua valendo como chave reserva
 - Legenda em cada foto do passo a passo (aparece embaixo da foto, na tela cheia e para leitores de tela)
-- Modo claro e escuro, layout para computador e celular
+- Modo claro e escuro, layout para computador e celular. No celular, o menu abre num painel no canto (o foco do teclado e do leitor de tela entra nele e volta ao botão ao fechar)
 - Instalável como app (iPhone, iPad, Android, Mac e Windows): botão discreto no cabeçalho e no rodapé. No Chrome e no Edge abre a janela de instalação do sistema; no Safari e nos outros, mostra o passo a passo. Depois de instalado, abre sem internet o que já foi visto
 - Projetos, planos de aula, fórum e comentários guardados no aparelho: a última versão vista aparece na hora, com o aviso "Sincronizando…" enquanto o servidor responde (e "Sem conexão" com o horário da versão mostrada, se não houver internet)
 - Página de **Privacidade** (LGPD) no rodapé, explicando o que o site guarda e onde, e lembrete nos formulários do público para não escrever dados de alunos

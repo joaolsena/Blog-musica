@@ -5,14 +5,7 @@ import { useAuth } from "./AuthContext";
 import RevealOnScroll from "./RevealOnScroll";
 import { MEMORIA, guardar, lerGuardado } from "./memoria";
 import { AvisoSincronia, useSincronia } from "./Sincronia";
-import { DURACOES, FAIXAS_ETARIAS, linhas } from "./tipos";
-
-// "Fundamental I · 2 aulas"
-export function resumoDoPlano(plano) {
-  const faixas = FAIXAS_ETARIAS.filter((f) => plano.faixasEtarias?.includes(f.valor)).map((f) => f.curto);
-  const duracao = DURACOES.find((d) => d.valor === plano.duracao)?.rotulo;
-  return [...faixas, duracao].filter(Boolean).join(" · ");
-}
+import { FAIXAS_ETARIAS, linhas, resumoDoPlano } from "./tipos";
 
 function CartaoPlano({ plano }) {
   const resumo = resumoDoPlano(plano);
