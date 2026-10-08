@@ -242,3 +242,110 @@ test("apagar um projeto apaga os comentários dele", async () => {
   const restantes = await mongoose.connection.collection("comentarios").countDocuments({ alvoId: new mongoose.Types.ObjectId(outro._id) });
   assert.equal(restantes, 0);
 });
+
+// **Tentativas de ataque** (cada teste tenta burlar uma proteção e confere que não deu certo)
+
+const FOTO = (nome) => `https://res.cloudinary.com/teste/image/upload/v1/projetos/${nome}.jpg`;
+
+test("ataque: comandos do MongoDB na edição não trocam o dono nem põem vídeo de outro site", async () => {
+  const daAna = (
+    await pedir("POST", "/adicionar", { token: contas.ana.token, corpo: { titulo: "Reco-reco", imagem: FOTO("reco") } })
+  ).dados;
+  const resposta = await pedir("PUT", `/projetos/${daAna._id}`, {
+    token: contas.ana.token,
+    corpo: {
+      titulo: "Reco-reco de bambu",
+      $set: { criadoPor: contas.beto.id, publicadoPor: "Administrador", videos: ["https://site-malicioso.com/v.mp4"] },
+      $unset: { titulo: 1 },
+    },
+  });
+  assert.equal(resposta.status, 200);
+  const salvo = (await pedir("GET", `/projetos/${daAna._id}`)).dados;
+  assert.equal(salvo.titulo, "Reco-reco de bambu");
+  assert.equal(salvo.criadoPor, contas.ana.id, "o dono continua o mesmo");
+  assert.equal(salvo.publicadoPor, "Ana Costa");
+  assert.deepEqual(salvo.videos, []);
+
+  const plano = (await pedir("POST", "/planos", { token: contas.ana.token, corpo: { titulo: "Aula de reco-reco" } })).dados;
+  await pedir("PUT", `/planos/${plano._id}`, {
+    token: contas.ana.token,
+    corpo: { titulo: "Aula de reco-reco", $set: { criadoPor: contas.beto.id } },
+  });
+  assert.equal((await pedir("GET", `/planos/${plano._id}`)).dados.criadoPor, contas.ana.id);
+  assert.equal((await pedir("POST", "/adicionar", { token: contas.ana.token, corpo: { titulo: { $gt: "" } } })).status, 400);
+});
+
+test("ataque: foto de fora do Cloudinary do site é recusada", async () => {
+  const deFora = await pedir("POST", "/adicionar", {
+    token: contas.ana.token,
+    corpo: { titulo: "Tambor", imagem: "https://site-malicioso.com/rastreador.gif" },
+  });
+  assert.equal(deFora.status, 400);
+  const outraConta = await pedir("POST", "/adicionar", {
+    token: contas.ana.token,
+    corpo: { titulo: "Tambor", imagensPassoAPasso: ["https://res.cloudinary.com/outra-conta/image/upload/v1/projetos/x.jpg"] },
+  });
+  assert.equal(outraConta.status, 400);
+});
+
+test("ataque: pôr a foto de um projeto alheio no seu e tirar não apaga a foto do outro", async () => {
+  const cloudinary = require("cloudinary").v2;
+  const apagadas = [];
+  const original = cloudinary.uploader.destroy;
+  cloudinary.uploader.destroy = async (publicId) => apagadas.push(publicId);
+  try {
+    const doBeto = (
+      await pedir("POST", "/adicionar", { token: contas.beto.token, corpo: { titulo: "Pandeiro", imagem: FOTO("pandeiro") } })
+    ).dados;
+    const daAna = (
+      await pedir("POST", "/adicionar", { token: contas.ana.token, corpo: { titulo: "Ganzá", imagem: FOTO("ganza") } })
+    ).dados;
+
+    // Ana põe a foto do Beto no projeto dela, depois volta para a sua e apaga o projeto
+    const comFotoAlheia = await pedir("PUT", `/projetos/${daAna._id}`, {
+      token: contas.ana.token,
+      corpo: { titulo: "Ganzá", imagensPassoAPasso: [FOTO("pandeiro")] },
+    });
+    assert.equal(comFotoAlheia.status, 200);
+    await pedir("PUT", `/projetos/${daAna._id}`, { token: contas.ana.token, corpo: { titulo: "Ganzá", imagensPassoAPasso: [] } });
+    await pedir("PUT", `/projetos/${daAna._id}`, { token: contas.ana.token, corpo: { titulo: "Ganzá", imagem: FOTO("pandeiro") } });
+    await pedir("DELETE", `/projetos/${daAna._id}`, { token: contas.ana.token });
+    await pedir("POST", "/midias/remover", { token: contas.ana.token, corpo: { urls: [FOTO("pandeiro")] } });
+
+    assert.ok(!apagadas.includes("projetos/pandeiro"), "a foto do Beto continua no Cloudinary");
+    assert.ok(apagadas.includes("projetos/ganza"), "a foto que só a Ana usava é apagada");
+    assert.equal((await pedir("GET", `/projetos/${doBeto._id}`)).dados.imagem, FOTO("pandeiro"));
+  } finally {
+    cloudinary.uploader.destroy = original;
+  }
+});
+
+test("trocar a senha desconecta os outros aparelhos; este continua com o token novo", async () => {
+  const dora = await criarAutor("Dora Reis", "dora@escola.br");
+  assert.equal((await pedir("GET", "/auth/eu", { token: dora.token })).status, 200);
+
+  // O administrador gerou uma senha nova (para quem esqueceu): o token antigo deixa de valer
+  const temporaria = (await pedir("POST", `/usuarios/${dora.id}/nova-senha`, { token: admin })).dados.senhaTemporaria;
+  assert.equal((await pedir("GET", "/auth/eu", { token: dora.token })).status, 401);
+
+  // Entra em dois aparelhos e troca a senha num deles
+  const celular = (await pedir("POST", "/auth/login", { corpo: { email: "dora@escola.br", senha: temporaria }, ip: novoIp() })).dados.token;
+  const computador = (await pedir("POST", "/auth/login", { corpo: { email: "dora@escola.br", senha: temporaria }, ip: novoIp() })).dados.token;
+  assert.equal((await pedir("GET", "/auth/eu", { token: celular })).status, 200);
+
+  const troca = await pedir("POST", "/auth/senha", {
+    token: computador,
+    corpo: { senhaAtual: temporaria, novaSenha: "uma-senha-nova-e-longa" },
+  });
+  assert.equal(troca.status, 200);
+  assert.equal((await pedir("GET", "/auth/eu", { token: celular })).status, 401, "o outro aparelho saiu");
+  assert.equal((await pedir("GET", "/auth/eu", { token: computador })).status, 401, "o token antigo deste também");
+  assert.equal((await pedir("GET", "/auth/eu", { token: troca.dados.sessao.token })).status, 200, "o token novo vale");
+});
+
+test("login responde igual para e-mail sem conta e senha errada", async () => {
+  const semConta = await pedir("POST", "/auth/login", { corpo: { email: "ninguem@escola.br", senha: "abc" }, ip: novoIp() });
+  const senhaErrada = await pedir("POST", "/auth/login", { corpo: { email: "ana@escola.br", senha: "abc" }, ip: novoIp() });
+  assert.equal(semConta.status, 401);
+  assert.deepEqual([semConta.status, semConta.dados], [senhaErrada.status, senhaErrada.dados]);
+});

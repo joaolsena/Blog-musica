@@ -77,9 +77,11 @@ const iguais = (a, b) => {
 
 // O token guarda a conta (uid) de quem entrou. Sem uid é a conta principal, que entra
 // com ADMIN_PASSWORD (tokens antigos, de antes das contas, também caem aqui).
-const criarToken = (uid = null) => {
+// "v" é a versão da sessão da conta: muda quando a senha é trocada, e aí os tokens antigos
+// (de outros aparelhos, ou de alguém que tenha copiado um) param de valer na hora.
+const criarToken = (uid = null, versao = 0) => {
   const expiraEm = Date.now() + DURACAO_TOKEN_MS;
-  const dados = Buffer.from(JSON.stringify({ exp: expiraEm, uid })).toString("base64url");
+  const dados = Buffer.from(JSON.stringify({ exp: expiraEm, uid, v: versao })).toString("base64url");
   return { token: `${dados}.${assinar(dados)}`, expiraEm };
 };
 
@@ -110,6 +112,9 @@ const contaDoPedido = async (req) => {
   }
   const conta = await Usuario.findById(conteudo.uid).lean();
   if (!conta || !conta.ativo) return { status: 401, mensagem: "Conta desativada ou removida" };
+  if ((conta.versaoSessao || 0) !== (conteudo.v || 0)) {
+    return { status: 401, mensagem: "A senha desta conta foi trocada. Entre novamente." };
+  }
   return { usuario: { id: String(conta._id), nome: conta.nome, email: conta.email, papel: conta.papel } };
 };
 
@@ -173,6 +178,9 @@ const gerarSenhaTemporaria = () => {
 
 const TAMANHO_MINIMO_SENHA = 8;
 
+// Usado quando o e-mail não tem conta (veja o login)
+const HASH_DE_MENTIRA = gerarHashSenha(crypto.randomBytes(16).toString("base64url"));
+
 // Limite de senhas erradas (guardado no banco, veja limites.js): 5 por IP a cada 15 minutos
 // e 10 por conta, para quem tenta uma mesma conta trocando de IP. Bloqueado, nem a senha
 // certa entra até a janela acabar.
@@ -214,10 +222,13 @@ api.post("/auth/login", async (req, res) => {
   // Com e-mail: conta individual
   try {
     const conta = await Usuario.findOne({ email }).lean();
-    if (!conta || !conta.ativo || !senhaConfere(senha, conta.senhaHash)) return errou();
+    // Sem conta, confere a senha mesmo assim: a resposta demora o mesmo tempo, e ninguém
+    // descobre quais e-mails têm conta medindo quanto o servidor leva para responder
+    const senhaCerta = senhaConfere(senha, conta?.senhaHash || HASH_DE_MENTIRA);
+    if (!conta || !conta.ativo || !senhaCerta) return errou();
     await Promise.all([limiteLoginPorIp.zerar(req.ip), limiteLoginPorConta.zerar(email)]);
     res.json({
-      ...criarToken(String(conta._id)),
+      ...criarToken(String(conta._id), conta.versaoSessao || 0),
       usuario: { id: String(conta._id), nome: conta.nome, email: conta.email, papel: conta.papel, trocarSenha: conta.trocarSenha },
     });
   } catch (error) {
@@ -297,6 +308,22 @@ const extrairMidia = (url) => {
 const midiasDoProjeto = (projeto) =>
   [projeto.imagem, ...(projeto.imagensPassoAPasso || []), ...(projeto.videos || [])].filter(Boolean);
 
+// Das URLs, as que algum projeto (fora o indicado) ainda usa
+const midiasEmUso = async (urls, excetoProjeto = null) => {
+  if (urls.length === 0) return new Set();
+  const filtro = { $or: [{ imagem: { $in: urls } }, { imagensPassoAPasso: { $in: urls } }, { videos: { $in: urls } }] };
+  if (excetoProjeto) filtro._id = { $ne: excetoProjeto };
+  const projetos = await Projeto.find(filtro, { imagem: 1, imagensPassoAPasso: 1, videos: 1 }).lean();
+  return new Set(projetos.flatMap(midiasDoProjeto));
+};
+
+// Apaga do Cloudinary as mídias que nenhum outro projeto usa. Sem essa conferência, alguém
+// poderia pôr a foto de um projeto alheio no seu, tirar de novo e fazer o servidor apagá-la.
+const apagarMidiasSemUso = async (urls, excetoProjeto = null) => {
+  const emUso = await midiasEmUso(urls, excetoProjeto);
+  await apagarMidias(urls.filter((url) => !emUso.has(url)));
+};
+
 // Apaga as mídias no Cloudinary; falhas são registradas mas não interrompem a requisição
 const apagarMidias = async (urls) => {
   const midias = new Map();
@@ -351,6 +378,18 @@ const videoPermitido = (url) =>
     (url.startsWith(`https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/`) &&
       extrairMidia(url)?.publicId.startsWith("videos/")));
 
+// Fotos aceitas: as enviadas pelo site ao Cloudinary desta conta (pasta "projetos")
+const imagemPermitida = (url) =>
+  typeof url === "string" &&
+  url.startsWith(`https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload/`) &&
+  Boolean(extrairMidia(url)?.publicId.startsWith("projetos/"));
+
+// Fotos do pedido que não vieram do site (na edição, as que o projeto já tinha continuam valendo)
+const imagensDeFora = (corpo, anterior) => {
+  const jaTinha = new Set(anterior ? midiasDoProjeto(anterior) : []);
+  return [corpo.imagem, ...(corpo.imagensPassoAPasso || [])].filter((url) => url && !imagemPermitida(url) && !jaTinha.has(url));
+};
+
 const LIMITE_LEGENDA = 160;
 
 // Confere as listas de mídia antes de salvar um projeto
@@ -367,6 +406,9 @@ const validarMidias = (req, res, next) => {
   }
   if (!videos.every(videoPermitido)) {
     return res.status(400).send("Vídeo inválido. Use um link do YouTube ou envie o arquivo do vídeo.");
+  }
+  if (!imagensPassoAPasso.every((url) => typeof url === "string")) {
+    return res.status(400).send("Lista de imagens inválida.");
   }
   // Legendas das fotos do passo a passo: uma por foto, na mesma ordem
   const { legendasPassoAPasso } = req.body;
@@ -441,6 +483,7 @@ const Usuario = mongoose.model(
       papel: { type: String, enum: ["admin", "autor"], default: "autor" },
       ativo: { type: Boolean, default: true },
       trocarSenha: { type: Boolean, default: true }, // senha temporária: pede uma nova no primeiro acesso
+      versaoSessao: { type: Number, default: 0 }, // sobe a cada troca de senha: desconecta os outros aparelhos
     },
     { timestamps: true }
   )
@@ -456,13 +499,31 @@ const contaPublica = (conta) => ({
   criadaEm: conta.createdAt,
 });
 
-// Campos que só o servidor define (o formulário não pode trocar o dono do projeto)
-const limparCamposDoServidor = (req, res, next) => {
-  delete req.body._id;
-  delete req.body.criadoPor;
-  delete req.body.publicadoPor;
+// Mantém do pedido só os campos que o formulário pode mudar, cada um com o tipo certo
+// (o dono do projeto e quem publicou são definidos pelo servidor, nunca pelo formulário).
+// Sem isso, alguém poderia mandar comandos do MongoDB (como "$set") no lugar dos campos
+// e pular as conferências: trocar o dono do projeto, pôr um vídeo de outro site etc.
+const somenteCampos = (camposTexto, camposLista = []) => (req, res, next) => {
+  const corpo = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {};
+  const limpo = {};
+  for (const campo of camposTexto) {
+    if (typeof corpo[campo] === "string" || corpo[campo] === null) limpo[campo] = corpo[campo];
+    else if (corpo[campo] !== undefined) return res.status(400).send(`Campo inválido: ${campo}.`);
+  }
+  for (const campo of camposLista) {
+    if (Array.isArray(corpo[campo])) limpo[campo] = corpo[campo];
+    else if (corpo[campo] !== undefined) return res.status(400).send(`Campo inválido: ${campo}.`);
+  }
+  req.body = limpo;
   next();
 };
+
+const CAMPOS_TEXTO_PROJETO = [
+  "titulo", "descricaoGeral", "materiais", "passoAPasso", "comoTocar", "comoJogar", "sugestoesAtividades",
+  "habilidadesMusicais", "autor", "imagem", "referencias", "tipoProjeto", "nivel", "duracao", "data",
+];
+const CAMPOS_LISTA_PROJETO = ["imagensPassoAPasso", "legendasPassoAPasso", "videos", "faixasEtarias"];
+const camposDoProjeto = somenteCampos(CAMPOS_TEXTO_PROJETO, CAMPOS_LISTA_PROJETO);
 
 // **Planos de aula, comentários e fórum** (planos.js e comunidade.js)
 const { Plano, registrarPlanos } = require("./planos");
@@ -471,7 +532,7 @@ const { dadosEstruturados, scriptJsonLd } = require("./dadosEstruturados");
 
 registrarPlanos(api, {
   exigirLogin,
-  limparCamposDoServidor,
+  somenteCampos,
   validarFicha,
   podeMexer: podeMexerNoProjeto,
   dataDeHoje,
@@ -506,7 +567,8 @@ api.get("/projetos/:id", async (req, res) => {
 });
 
 // Rota para adicionar um novo projeto (as mídias já chegam como URLs)
-api.post("/adicionar", exigirLogin, limparCamposDoServidor, validarMidias, validarFicha, async (req, res) => {
+api.post("/adicionar", exigirLogin, camposDoProjeto, validarMidias, validarFicha, async (req, res) => {
+  if (imagensDeFora(req.body).length > 0) return res.status(400).send("Imagem inválida. Envie as fotos pelo formulário.");
   try {
     const novoProjeto = new Projeto({
       ...req.body,
@@ -523,7 +585,7 @@ api.post("/adicionar", exigirLogin, limparCamposDoServidor, validarMidias, valid
 });
 
 // Rota para editar um projeto existente
-api.put("/projetos/:id", exigirLogin, limparCamposDoServidor, validarMidias, validarFicha, async (req, res) => {
+api.put("/projetos/:id", exigirLogin, camposDoProjeto, validarMidias, validarFicha, async (req, res) => {
   try {
     const projetoAnterior = await Projeto.findById(req.params.id);
 
@@ -533,12 +595,18 @@ api.put("/projetos/:id", exigirLogin, limparCamposDoServidor, validarMidias, val
     if (!podeMexerNoProjeto(req.usuario, projetoAnterior)) {
       return res.status(403).send("Você só pode editar os projetos que você publicou.");
     }
+    if (imagensDeFora(req.body, projetoAnterior).length > 0) {
+      return res.status(400).send("Imagem inválida. Envie as fotos pelo formulário.");
+    }
 
     const projetoAtualizado = await Projeto.findByIdAndUpdate(req.params.id, req.body, { new: true });
 
     // Apagar do Cloudinary as imagens e vídeos que deixaram de fazer parte do projeto
     const midiasAtuais = new Set(midiasDoProjeto(projetoAtualizado));
-    await apagarMidias(midiasDoProjeto(projetoAnterior).filter((url) => !midiasAtuais.has(url)));
+    await apagarMidiasSemUso(
+      midiasDoProjeto(projetoAnterior).filter((url) => !midiasAtuais.has(url)),
+      projetoAtualizado._id
+    );
 
     res.status(200).json(projetoAtualizado);
   } catch (error) {
@@ -563,7 +631,7 @@ api.delete("/projetos/:id", exigirLogin, async (req, res) => {
       return res.status(404).send("Projeto não encontrado para excluir");
     }
 
-    await apagarMidias(midiasDoProjeto(projetoRemovido));
+    await apagarMidiasSemUso(midiasDoProjeto(projetoRemovido), projetoRemovido._id);
     await apagarComentariosDe("projeto", projetoRemovido._id);
 
     res.status(200).send("Projeto excluído com sucesso");
@@ -603,13 +671,7 @@ api.post("/midias/remover", exigirLogin, async (req, res) => {
     const urls = Array.isArray(req.body.urls) ? req.body.urls.filter((url) => typeof url === "string") : [];
 
     // Nunca apagar mídias que estejam em uso por algum projeto
-    const emUso = await Projeto.find(
-      { $or: [{ imagem: { $in: urls } }, { imagensPassoAPasso: { $in: urls } }, { videos: { $in: urls } }] },
-      { imagem: 1, imagensPassoAPasso: 1, videos: 1 }
-    );
-    const urlsEmUso = new Set(emUso.flatMap(midiasDoProjeto));
-
-    await apagarMidias(urls.filter((url) => !urlsEmUso.has(url)));
+    await apagarMidiasSemUso(urls);
     res.status(200).send("Mídias removidas");
   } catch (error) {
     console.error("Erro ao remover mídias:", error);
@@ -639,8 +701,10 @@ api.post("/auth/senha", exigirLogin, async (req, res) => {
     if (!senhaConfere(senhaAtual, conta.senhaHash)) return res.status(400).send("A senha atual está incorreta.");
     conta.senhaHash = gerarHashSenha(novaSenha);
     conta.trocarSenha = false;
+    conta.versaoSessao = (conta.versaoSessao || 0) + 1; // os outros aparelhos saem da conta
     await conta.save();
-    res.json(contaPublica(conta));
+    // Este aparelho continua conectado, com um token da versão nova
+    res.json({ ...contaPublica(conta), sessao: criarToken(String(conta._id), conta.versaoSessao) });
   } catch (error) {
     console.error("Erro ao trocar senha:", error);
     res.status(500).send("Erro ao trocar a senha");
@@ -710,7 +774,7 @@ api.post("/usuarios/:uid/nova-senha", exigirAdmin, async (req, res) => {
     const senhaTemporaria = gerarSenhaTemporaria();
     const conta = await Usuario.findByIdAndUpdate(
       req.params.uid,
-      { senhaHash: gerarHashSenha(senhaTemporaria), trocarSenha: true },
+      { senhaHash: gerarHashSenha(senhaTemporaria), trocarSenha: true, $inc: { versaoSessao: 1 } },
       { new: true }
     ).lean();
     if (!conta) return res.status(404).send("Conta não encontrada");

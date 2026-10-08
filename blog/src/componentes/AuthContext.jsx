@@ -77,11 +77,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Atualiza os dados da conta na sessão (ex.: depois de trocar a senha)
-  const atualizarUsuario = useCallback((novo) => {
+  // Atualiza os dados da conta na sessão (ex.: depois de trocar a senha). Ao trocar a senha
+  // o servidor desconecta os outros aparelhos e manda um token novo ({ token, expiraEm }) para este.
+  const atualizarUsuario = useCallback((novo, tokenNovo) => {
+    // Já vale para o próximo pedido (o antigo foi recusado pelo servidor ao trocar a senha)
+    if (tokenNovo?.token) tokenAtual = tokenNovo.token;
     setSessao((atual) => {
       if (!atual) return atual;
-      const sessaoNova = { ...atual, usuario: { ...(atual.usuario || CONTA_PRINCIPAL), ...novo } };
+      const sessaoNova = {
+        ...atual,
+        ...(tokenNovo?.token ? { token: tokenNovo.token, expiraEm: tokenNovo.expiraEm } : {}),
+        usuario: { ...(atual.usuario || CONTA_PRINCIPAL), ...novo },
+      };
       salvarSessao(sessaoNova);
       return sessaoNova;
     });

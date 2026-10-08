@@ -32,11 +32,11 @@ function MinhaConta() {
     }
     setSalvando(true);
     try {
-      await axios.post("/auth/senha", { senhaAtual: senhas.senhaAtual, novaSenha: senhas.novaSenha });
+      const { data } = await axios.post("/auth/senha", { senhaAtual: senhas.senhaAtual, novaSenha: senhas.novaSenha });
       const eraTemporaria = usuario.trocarSenha;
-      atualizarUsuario({ trocarSenha: false });
+      atualizarUsuario({ trocarSenha: false }, data?.sessao);
       setSenhas({ senhaAtual: "", novaSenha: "", confirmacao: "" });
-      toast.success("Senha alterada.");
+      toast.success(eraTemporaria ? "Senha criada." : "Senha alterada. Os outros aparelhos foram desconectados.");
       if (eraTemporaria) navigate("/");
     } catch (error) {
       setErro(typeof error.response?.data === "string" ? error.response.data : "Não foi possível trocar a senha agora.");

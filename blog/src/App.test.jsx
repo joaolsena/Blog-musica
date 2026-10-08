@@ -136,6 +136,30 @@ describe("login", () => {
     expect(axios.post).toHaveBeenCalledWith("/auth/login", { email: "ana@escola.com", senha: "abcde-fghij" });
   });
 
+  test("trocar a senha guarda o token novo (o servidor desconecta os outros aparelhos)", async () => {
+    localStorage.setItem(
+      "ensine-musica:sessao",
+      JSON.stringify({
+        token: "token-antigo",
+        expiraEm: Date.now() + 60000,
+        usuario: { id: "u1", nome: "Ana Costa", email: "ana@escola.com", papel: "autor", trocarSenha: false },
+      })
+    );
+    axios.get.mockResolvedValue({ data: { total: 0 } });
+    axios.post.mockResolvedValue({
+      data: { id: "u1", nome: "Ana Costa", trocarSenha: false, sessao: { token: "token-novo", expiraEm: Date.now() + 90000 } },
+    });
+    abrir("/minha-conta");
+
+    await userEvent.type(await screen.findByLabelText("Senha atual"), "senha-antiga");
+    await userEvent.type(screen.getByLabelText("Nova senha"), "senha-nova-longa");
+    await userEvent.type(screen.getByLabelText("Repita a nova senha"), "senha-nova-longa");
+    await userEvent.click(screen.getByRole("button", { name: /Trocar senha|Salvar/ }));
+
+    expect(axios.post).toHaveBeenCalledWith("/auth/senha", { senhaAtual: "senha-antiga", novaSenha: "senha-nova-longa" });
+    await vi.waitFor(() => expect(JSON.parse(localStorage.getItem("ensine-musica:sessao")).token).toBe("token-novo"));
+  });
+
   test("muitas tentativas mostram o aviso de bloqueio", async () => {
     axios.post.mockRejectedValue({ response: { status: 429 } });
     abrir("/login");

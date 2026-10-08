@@ -63,7 +63,10 @@ const validarPlano = (req, res, next) => {
   next();
 };
 
-function registrarPlanos(api, { exigirLogin, limparCamposDoServidor, validarFicha, podeMexer, dataDeHoje, aoApagar }) {
+function registrarPlanos(api, { exigirLogin, somenteCampos, validarFicha, podeMexer, dataDeHoje, aoApagar }) {
+  // Só os campos do formulário (veja somenteCampos em server.js)
+  const camposDoPlano = somenteCampos(["titulo", "duracao", ...CAMPOS_TEXTO], ["faixasEtarias", "projetos"]);
+
   api.get("/planos", async (req, res) => {
     try {
       const planos = await Plano.find().sort({ createdAt: -1 }).populate("projetos", CAMPOS_PROJETO_LISTA).lean();
@@ -85,7 +88,7 @@ function registrarPlanos(api, { exigirLogin, limparCamposDoServidor, validarFich
     }
   });
 
-  api.post("/planos", exigirLogin, limparCamposDoServidor, validarFicha, validarPlano, async (req, res) => {
+  api.post("/planos", exigirLogin, camposDoPlano, validarFicha, validarPlano, async (req, res) => {
     try {
       const plano = await Plano.create({
         ...req.body,
@@ -100,14 +103,13 @@ function registrarPlanos(api, { exigirLogin, limparCamposDoServidor, validarFich
     }
   });
 
-  api.put("/planos/:id", exigirLogin, limparCamposDoServidor, validarFicha, validarPlano, async (req, res) => {
+  api.put("/planos/:id", exigirLogin, camposDoPlano, validarFicha, validarPlano, async (req, res) => {
     try {
       const plano = await Plano.findById(req.params.id);
       if (!plano) return res.status(404).send("Plano de aula não encontrado");
       if (!podeMexer(req.usuario, plano)) {
         return res.status(403).send("Você só pode editar os planos que você publicou.");
       }
-      delete req.body.data;
       const atualizado = await Plano.findByIdAndUpdate(req.params.id, req.body, { new: true });
       res.json(atualizado);
     } catch (error) {
