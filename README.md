@@ -15,6 +15,7 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 - Ficha de cada projeto (para quem é, nível e duração) e filtros por turma, nível e duração na página inicial
 - Botão "Baixar PDF" em cada projeto: arquivo pronto para imprimir, com capa, ficha, materiais em lista para marcar, fotos do passo a passo com legendas e links dos vídeos. Os textos longos saem justificados; as referências, alinhadas à esquerda. O PDF é gerado no próprio navegador, com as fontes do site (`blog/src/assets/fontes`, licença OFL)
 - Prévia própria de cada projeto ao compartilhar o link (título, descrição e foto no WhatsApp, Facebook etc.) e sitemap para o Google
+- Dados estruturados (schema.org) para o Google em cada projeto, plano de aula e tópico do fórum: tipo de material, autor, data, turmas, fotos, trilha "Ensine Música › Fórum › …" e, no fórum, as respostas (`server/dadosEstruturados.js`). Para conferir uma página publicada: [teste de resultados avançados](https://search.google.com/test/rich-results)
 - Rascunho automático ao cadastrar um projeto (textos, fotos e vídeos) e ao escrever ou editar um plano de aula: o que foi digitado volta se a página recarregar ou o login vencer
 - Segurança: limite de senhas erradas (5 por aparelho e 10 por conta a cada 15 minutos) contado no banco, para valer em todas as cópias do servidor no Vercel; cabeçalhos que impedem outro site de exibir o Ensine Música dentro dele
 - Backup: botão para baixar e restaurar tudo (projetos, planos de aula, fórum e comentários) e cópia automática dos projetos e planos toda segunda-feira no GitHub (branch `backups`)
@@ -23,6 +24,8 @@ Site: [ensine-musica.vercel.app](https://ensine-musica.vercel.app)
 - Legenda em cada foto do passo a passo (aparece embaixo da foto, na tela cheia e para leitores de tela)
 - Modo claro e escuro, layout para computador e celular. No celular, o menu abre num painel no canto (o foco do teclado e do leitor de tela entra nele e volta ao botão ao fechar)
 - Instalável como app (iPhone, iPad, Android, Mac e Windows): botão discreto no cabeçalho e no rodapé. No Chrome e no Edge abre a janela de instalação do sistema; no Safari e nos outros, mostra o passo a passo. Depois de instalado, abre sem internet o que já foi visto
+- Site carregado por partes: a página inicial e a de projeto vêm no arquivo principal; as outras páginas e o painel da busca, em arquivos à parte, baixados quando são abertos. Na primeira visita, o service worker guarda os arquivos de todas as páginas, para abrirem sem internet (a lista é gerada na compilação, em `blog/vite.config.js`)
+- Tela de erro no lugar da página, em vez de tela branca, se algo quebrar. Se uma aba aberta antes de uma versão nova pedir um arquivo que não existe mais, o site recarrega sozinho uma vez
 - Projetos, planos de aula, fórum e comentários guardados no aparelho: a última versão vista aparece na hora, com o aviso "Sincronizando…" enquanto o servidor responde (e "Sem conexão" com o horário da versão mostrada, se não houver internet)
 - Página de **Privacidade** (LGPD) no rodapé, explicando o que o site guarda e onde, e lembrete nos formulários do público para não escrever dados de alunos
 
@@ -118,8 +121,8 @@ As variáveis `VITE_*` são embutidas no site durante a compilação: depois de 
 ## Testes
 
 ```bash
-cd blog && npm test       # site: componentes, filtros, busca, 404, login, comentários, fórum, planos
-cd server && npm test     # servidor: login, permissões, limites, planos, comentários, fórum, backup
+cd blog && npm test       # site: componentes, filtros, busca, 404, tela de erro, login, comentários, fórum, planos
+cd server && npm test     # servidor: login, permissões, limites, planos, comentários, fórum, backup, dados para o Google
 ```
 
 Os testes do servidor usam um MongoDB temporário, criado na memória só para eles (`server/integracao.test.js`; na primeira vez ele baixa o MongoDB, uns 80 MB). Nenhum teste acessa o banco de verdade nem o Cloudinary.

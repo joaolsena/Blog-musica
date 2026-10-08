@@ -55,6 +55,31 @@
     <meta property="og:image:alt" content="Ensine Música — Música se aprende fazendo" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="google-site-verification" content="bzK2Ol1Uk4SoricVL5Vzyw1zPAqEbZ7h-yXnQHgOun0" />
+
+    <!-- Para o Google: o nome do site e quem o publica. As páginas de projeto, plano e
+         fórum ganham mais um bloco, montado pelo servidor (server/dadosEstruturados.js). -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "%VITE_SITE_URL%/#site",
+            "name": "Ensine Música",
+            "url": "%VITE_SITE_URL%/",
+            "inLanguage": "pt-BR",
+            "publisher": { "@id": "%VITE_SITE_URL%/#organizacao" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "%VITE_SITE_URL%/#organizacao",
+            "name": "Ensine Música",
+            "url": "%VITE_SITE_URL%/",
+            "logo": "%VITE_SITE_URL%/app/icon-512.png"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <noscript>Ative o JavaScript para usar o Ensine Música.</noscript>

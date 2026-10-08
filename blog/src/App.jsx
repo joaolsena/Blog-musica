@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { Suspense, lazy, useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -8,27 +8,32 @@ import {
 import { Toaster } from "sonner";
 import "./App.css";
 import ProjetoDetalhes from "./componentes/ProjetoDetalhes"; // Página de detalhes
-import EnsineMusica from "./componentes/EnsineMusica"; // Página sobre o Ensine Música
 import Navbar from "./componentes/Navbar"; // Cabeçalho e navegação principal
 import Footer from "./componentes/Footer"; // Rodapé
 import Projetos from "./componentes/Projetos"; // Página inicial
-import AdicionarProjeto from "./componentes/AdicionarProjeto"; // Página de adicionar projeto
-import EditProjeto from "./componentes/EditProjeto"; // Página de edição do projeto
-import Backup from "./componentes/Backup"; // Backup dos projetos (área do professor)
-import Contas from "./componentes/Contas"; // Contas de professores e alunos (administradores)
-import MinhaConta from "./componentes/MinhaConta"; // Dados e senha da própria conta
-import Planos from "./componentes/Planos"; // Lista de planos de aula
-import PlanoDetalhes from "./componentes/PlanoDetalhes"; // Página de um plano de aula
-import FormPlano from "./componentes/FormPlano"; // Escrever ou editar um plano de aula
-import Forum from "./componentes/Forum"; // Fórum: lista de tópicos
-import TopicoForum from "./componentes/TopicoForum"; // Um tópico do fórum com as respostas
-import Moderacao from "./componentes/Moderacao"; // Aprovar comentários e tópicos de visitantes
-import Privacidade from "./componentes/Privacidade"; // O que o site guarda e por quê
-import LoginPage from "./componentes/Login"; // Tela de login
+import NaoEncontrado from "./componentes/NaoEncontrado"; // Página 404 (a de projeto também usa)
 import { AuthProvider } from "./componentes/AuthContext"; // Provedor do contexto de autenticação
 import PrivateRoute from "./componentes/PrivateRoute"; // Componente para proteger rotas privadas
 import { TemaProvider, useTema } from "./componentes/Tema"; // Tema claro/escuro
-import NaoEncontrado from "./componentes/NaoEncontrado"; // Página 404
+import { CarregandoPagina, LimiteDeErro } from "./componentes/LimiteDeErro"; // Tela de erro
+
+// As outras páginas vêm em arquivos à parte, baixados só quando alguém abre a página.
+// A inicial e a de um projeto (a que mais chega por links compartilhados) já vêm junto.
+// O service worker guarda todos esses arquivos na primeira visita, para abrir sem internet.
+const EnsineMusica = lazy(() => import("./componentes/EnsineMusica")); // Página sobre o Ensine Música
+const AdicionarProjeto = lazy(() => import("./componentes/AdicionarProjeto")); // Adicionar projeto
+const EditProjeto = lazy(() => import("./componentes/EditProjeto")); // Editar projeto
+const Backup = lazy(() => import("./componentes/Backup")); // Backup (administradores)
+const Contas = lazy(() => import("./componentes/Contas")); // Contas de professores e alunos (administradores)
+const MinhaConta = lazy(() => import("./componentes/MinhaConta")); // Dados e senha da própria conta
+const Planos = lazy(() => import("./componentes/Planos")); // Lista de planos de aula
+const PlanoDetalhes = lazy(() => import("./componentes/PlanoDetalhes")); // Página de um plano de aula
+const FormPlano = lazy(() => import("./componentes/FormPlano")); // Escrever ou editar um plano de aula
+const Forum = lazy(() => import("./componentes/Forum")); // Fórum: lista de tópicos
+const TopicoForum = lazy(() => import("./componentes/TopicoForum")); // Um tópico do fórum com as respostas
+const Moderacao = lazy(() => import("./componentes/Moderacao")); // Aprovar comentários e tópicos de visitantes
+const Privacidade = lazy(() => import("./componentes/Privacidade")); // O que o site guarda e por quê
+const LoginPage = lazy(() => import("./componentes/Login")); // Tela de login
 
 // Conteúdo das rotas. Fica separado do App porque precisa estar dentro do Router
 // para usar useLocation.
@@ -42,7 +47,10 @@ function Paginas() {
 
   return (
     // A key faz a página remontar a cada navegação, disparando a transição de entrada
+    // O limite de erro também é por página: ao navegar, um erro numa página não segue para a próxima
     <div className="page" key={location.pathname}>
+      <LimiteDeErro>
+      <Suspense fallback={<CarregandoPagina />}>
       <Routes location={location}>
         {/* Página inicial com a lista de projetos */}
         <Route path="/" element={<Projetos />} />
@@ -144,6 +152,8 @@ function Paginas() {
         {/* Qualquer outro endereço */}
         <Route path="*" element={<NaoEncontrado />} />
       </Routes>
+      </Suspense>
+      </LimiteDeErro>
     </div>
   );
 }

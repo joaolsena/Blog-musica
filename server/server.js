@@ -467,6 +467,7 @@ const limparCamposDoServidor = (req, res, next) => {
 // **Planos de aula, comentários e fórum** (planos.js e comunidade.js)
 const { Plano, registrarPlanos } = require("./planos");
 const { Comentario, Topico, registrarComunidade, apagarComentariosDe } = require("./comunidade");
+const { dadosEstruturados, scriptJsonLd } = require("./dadosEstruturados");
 
 registrarPlanos(api, {
   exigirLogin,
@@ -826,7 +827,7 @@ const imagemDePrevia = (url) =>
     : null;
 
 // { titulo, descricao, imagem } da página: projeto, plano de aula ou tópico do fórum
-function paginaComPrevia(html, { titulo, descricao, imagem }, enderecoDaPagina) {
+function paginaComPrevia(html, { titulo, descricao, imagem, dados }, enderecoDaPagina) {
   let pagina = html.replace(/<title>[^<]*<\/title>/, `<title>${escaparHtml(`${titulo} — Ensine Música`)}</title>`);
   pagina = trocarMeta(pagina, "name", "description", descricao);
   pagina = trocarMeta(pagina, "property", "og:type", "article");
@@ -835,34 +836,48 @@ function paginaComPrevia(html, { titulo, descricao, imagem }, enderecoDaPagina) 
   pagina = trocarMeta(pagina, "property", "og:url", enderecoDaPagina);
   pagina = trocarMeta(pagina, "property", "og:image:alt", titulo);
   if (imagem) pagina = trocarMeta(pagina, "property", "og:image", imagem);
-  return pagina.replace("</head>", `    <link rel="canonical" href="${escaparHtml(enderecoDaPagina)}" />\n  </head>`);
+  const extras = [`<link rel="canonical" href="${escaparHtml(enderecoDaPagina)}" />`];
+  if (dados) extras.push(scriptJsonLd(dados));
+  return pagina.replace("</head>", `${extras.map((tag) => `    ${tag}\n`).join("")}  </head>`);
 }
 
-// Cada tipo de página: o caminho no site e como achar o título, a descrição e a foto
+// Cada tipo de página: o caminho no site e como achar o título, a descrição e a foto,
+// mais os dados estruturados para o Google (dadosEstruturados.js)
 const PAGINAS_COM_PREVIA = {
-  projeto: async (id) => {
+  projeto: async (id, enderecos) => {
     const projeto = await Projeto.findById(id).lean();
     return (
       projeto && {
         titulo: projeto.titulo,
         descricao: resumir(projeto.descricaoGeral) || "Projeto de educação musical com materiais alternativos.",
         imagem: imagemDePrevia(projeto.imagem),
+        dados: dadosEstruturados({ tipo: "projeto", item: projeto, ...enderecos }),
       }
     );
   },
-  plano: async (id) => {
-    const plano = await Plano.findById(id).populate("projetos", "imagem").lean();
+  plano: async (id, enderecos) => {
+    const plano = await Plano.findById(id).populate("projetos", "titulo imagem").lean();
     return (
       plano && {
         titulo: plano.titulo,
         descricao: resumir(plano.resumo) || "Plano de aula de música do Ensine Música.",
         imagem: imagemDePrevia(plano.projetos?.find((p) => p?.imagem)?.imagem),
+        dados: dadosEstruturados({ tipo: "plano", item: plano, ...enderecos }),
       }
     );
   },
-  forum: async (id) => {
+  forum: async (id, enderecos) => {
     const topico = await Topico.findOne({ _id: id, status: "aprovado" }).lean();
-    return topico && { titulo: topico.titulo, descricao: resumir(topico.texto) || "Conversa no fórum do Ensine Música." };
+    if (!topico) return null;
+    const respostas = await Comentario.find({ alvoTipo: "topico", alvoId: topico._id, status: "aprovado" })
+      .sort({ createdAt: 1 })
+      .limit(50)
+      .lean();
+    return {
+      titulo: topico.titulo,
+      descricao: resumir(topico.texto) || "Conversa no fórum do Ensine Música.",
+      dados: dadosEstruturados({ tipo: "forum", item: topico, respostas, ...enderecos }),
+    };
   },
 };
 
@@ -881,9 +896,11 @@ app.get(["/projeto/:id", "/plano/:id", "/forum/:id"], async (req, res) => {
 
   if (!/^[0-9a-f]{24}$/i.test(req.params.id)) return res.status(404).send(html);
   try {
-    const previa = await PAGINAS_COM_PREVIA[tipo](req.params.id);
+    const origem = origemDoSite(req);
+    const endereco = `${origem}/${tipo}/${req.params.id}`;
+    const previa = await PAGINAS_COM_PREVIA[tipo](req.params.id, { endereco, origem });
     if (!previa) return res.status(404).send(html);
-    res.send(paginaComPrevia(html, previa, `${origemDoSite(req)}/${tipo}/${req.params.id}`));
+    res.send(paginaComPrevia(html, previa, endereco));
   } catch (error) {
     console.error("Erro ao montar a prévia da página:", error);
     res.send(html); // sem a prévia, mas a página funciona normalmente

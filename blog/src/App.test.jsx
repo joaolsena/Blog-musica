@@ -111,7 +111,7 @@ describe("login", () => {
     axios.post.mockRejectedValue({ response: { status: 401 } });
     abrir("/login");
 
-    await userEvent.type(screen.getByLabelText("Senha"), "errada");
+    await userEvent.type(await screen.findByLabelText("Senha"), "errada");
     await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Senha incorreta");
@@ -128,7 +128,7 @@ describe("login", () => {
     });
     abrir("/login");
 
-    await userEvent.type(screen.getByLabelText("E-mail"), "ana@escola.com");
+    await userEvent.type(await screen.findByLabelText("E-mail"), "ana@escola.com");
     await userEvent.type(screen.getByLabelText("Senha"), "abcde-fghij");
     await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
 
@@ -140,15 +140,15 @@ describe("login", () => {
     axios.post.mockRejectedValue({ response: { status: 429 } });
     abrir("/login");
 
-    await userEvent.type(screen.getByLabelText("Senha"), "errada");
+    await userEvent.type(await screen.findByLabelText("Senha"), "errada");
     await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Muitas tentativas");
   });
 
-  test("páginas de professor exigem login", () => {
+  test("páginas de professor exigem login", async () => {
     abrir("/adicionar-projeto");
-    expect(screen.getByRole("heading", { name: "Área do professor" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Área do professor" })).toBeInTheDocument();
   });
 });
 

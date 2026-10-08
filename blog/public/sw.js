@@ -2,14 +2,18 @@
 // que já foi visto mesmo sem internet.
 //
 // - Páginas: busca na rede; sem conexão, usa a última versão guardada.
-// - Arquivos do site (/assets, com nome que muda a cada versão): guardados na primeira vez.
+// - Arquivos do site (/assets, com nome que muda a cada versão): os de todas as páginas são
+//   guardados na instalação; outros (como o gerador de PDF), na primeira vez que são usados.
 // Os dados (projetos, planos, fórum, comentários) não passam por aqui: o próprio site guarda
 // a última versão no aparelho (memoria.js) e avisa "Sem conexão" com o horário dela. Se o
 // service worker também respondesse com a cópia guardada, o site acharia que veio do
 // servidor e mostraria "Tudo atualizado" mesmo sem internet.
 // As imagens do Cloudinary não são guardadas: o navegador já faz o cache delas.
 
-const VERSAO = "v3";
+// Na compilação, o vite.config.js troca estes dois pela versão do site e pela lista de
+// arquivos de todas as páginas (que vêm separados e precisam estar guardados para abrir offline)
+const VERSAO = "/* __VERSAO__ */";
+const ARQUIVOS_DO_SITE = /* __ARQUIVOS_DO_SITE__ */ [];
 const CACHE_APP = `ensine-musica-app-${VERSAO}`;
 
 // Na instalação, guarda a página base e os arquivos que ela carrega
@@ -21,7 +25,7 @@ self.addEventListener("install", (evento) => {
       const html = await resposta.clone().text();
       const arquivos = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
       await cache.put("/", resposta);
-      await cache.addAll([...new Set(arquivos), "/favicon.svg", "/app/icon-192.png"]);
+      await cache.addAll([...new Set([...arquivos, ...ARQUIVOS_DO_SITE]), "/favicon.svg", "/app/icon-192.png"]);
       await self.skipWaiting();
     })()
   );
